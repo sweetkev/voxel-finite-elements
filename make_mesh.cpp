@@ -14,7 +14,7 @@ int main() {
 
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 3; j++) {
-            mesh.AddVertex(Vertex(real_t(i%3), real_t(j%3))());
+            mesh.AddVertex(Vertex(i%3, j%3)());
         }
     }
 

@@ -11,5 +11,5 @@ CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
 
 .PHONY: clean
 
-make_mesh: make_mesh.cpp
+mesh_example: mesh_example.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $< -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) 
