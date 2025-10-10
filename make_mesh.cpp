@@ -17,7 +17,7 @@ void makeMesh(std::string pgm_file) {
 
     //find number of vertices, and start of index in each row stored in an array
     //the entry in r_start[j] gives the index of the first vertex in row j
-    int r_start[m+1];                                                   
+    int r_start[n+1];                                                   
     int nv = 0;
     for(int j = 0; j < n+1; j++) {
         for(int i = 0; i < m+1; i++) {
@@ -41,22 +41,24 @@ void makeMesh(std::string pgm_file) {
 
     //add vertices (uses integer coordinates, so each pixel will be 1x1)
     for(int j = 0; j < n+1; j++) {
-        for(int i = 0; i < n+1; i++) {
+        for(int i = 0; i < m+1; i++) {
             if(adjacentPixelFilled(i,j,image)) {
-                mesh.AddVertex(i,j);
+                mesh.AddVertex(i,n-j);
             }
         }
     }
 
     //add quads
+    int ui = 0;
+    int di = 0;
     for(int j = 0; j < n; j++) {
         //"upper index" and "down index". Keeps track of vertex index in rows of vertices above and below pixels.
-        int ui = 0;
-        int di = 0;
-        for(int i = 0; i < n; i++) {
+        ui = 0;
+        di = 0;
+        for(int i = 0; i < m; i++) {
             //add quad for filled in pixels
             if(image.operator()(i,j) != 0) {
-                mesh.AddQuad(r_start[j]+ui, r_start[j]+ui+1, r_start[j+1]+di+1, r_start[j+1]+di);
+                mesh.AddQuad(r_start[j+1]+di, r_start[j+1]+di+1, r_start[j]+ui+1, r_start[j]+ui);
                 di++;
                 ui++;
                 continue;
