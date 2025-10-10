@@ -11,5 +11,8 @@ CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
 
 .PHONY: clean
 
+pixels: pixels.cpp
+	$(MFEM_CXX) $(MFEM_CXXFLAGS) $< ppm.cpp make_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+
 mesh_example: mesh_example.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $< -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) 
