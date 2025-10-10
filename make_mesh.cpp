@@ -62,23 +62,12 @@ void makeMesh(std::string pgm_file) {
                 continue;
             }
 
-            //if current pixel is not filled in, we progress down and upper indices if filled in pixels are above or below or left
-            if(i != 0) {
-                if(image.operator()(i-1,j) != 0) {
-                    ui++;
-                    di++;
-                    continue;
-                }
+            //if current pixel is not filled in, we progress down and upper indices left-side vertices are used by adjacent pixels
+            if(adjacentPixelFilled(i,j,image)) {
+                ui++;
             }
-            if(j != 0) {
-                if(image.operator()(i,j-1) != 0) {
-                    ui++;
-                }
-            }
-            if(j != n-1) {
-                if(image.operator()(i,j+1) != 0) {
-                    di++;
-                }
+            if(adjacentPixelFilled(i,j+1,image)) {
+                di++;
             }
         }
     }
@@ -156,4 +145,3 @@ int numElements(PixelImage image) {
 
     return ne;
 }
-
