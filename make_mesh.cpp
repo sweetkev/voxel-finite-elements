@@ -20,10 +20,8 @@ void makeMesh(std::string pgm_file) {
     int r_start[n+1];                                                   
     int nv = 0;
     for(int j = 0; j < n+1; j++) {
+        r_start[j] = nv;
         for(int i = 0; i < m+1; i++) {
-            if(i == 0) {
-                r_start[j] = nv;
-            }
             if(adjacentPixelFilled(i,j,image)) {
                 nv++;
             }
@@ -59,12 +57,19 @@ void makeMesh(std::string pgm_file) {
             //add quad for filled in pixels
             if(image.operator()(i,j) != 0) {
                 mesh.AddQuad(r_start[j+1]+di, r_start[j+1]+di+1, r_start[j]+ui+1, r_start[j]+ui);
-                di++;
                 ui++;
+                di++;
                 continue;
             }
 
-            //if current pixel is not filled in, we progress down and upper indices if filled in pixels are above or below
+            //if current pixel is not filled in, we progress down and upper indices if filled in pixels are above or below or left
+            if(i != 0) {
+                if(image.operator()(i-1,j) != 0) {
+                    ui++;
+                    di++;
+                    continue;
+                }
+            }
             if(j != 0) {
                 if(image.operator()(i,j-1) != 0) {
                     ui++;
