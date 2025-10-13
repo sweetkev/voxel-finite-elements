@@ -1,7 +1,6 @@
 #include "make_mesh.hpp"
 #include "ppm.hpp"
-//ensure path to mfem.hpp is correct
-#include "../mfem/mfem-4.8/mfem.hpp"
+#include "mfem.hpp"
 #include <iostream>
 #include <string>
 
@@ -11,6 +10,7 @@ void makeMesh(std::string pgm_file) {
     //make PixelImage
     PixelImage image(pgm_file);
     int m = image.Width(), n = image.Height(); 
+    
     
     //dimension of domain and ambient space
     int dim = 2, sdim = 2;

@@ -6,13 +6,11 @@ endif
 
 MFEM_BUILD_DIR = $(MFEM_DIR)
 CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
+INC = -I$(MFEM_DIR)
 
 -include $(CONFIG_MK)
 
 .PHONY: clean
 
 pixels: pixels.cpp ppm.cpp make_mesh.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $< ppm.cpp make_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
-
-mesh_example: mesh_example.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $< -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) 
+	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(INC) $< ppm.cpp make_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)

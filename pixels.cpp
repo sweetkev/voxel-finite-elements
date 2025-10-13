@@ -1,6 +1,6 @@
 #include "make_mesh.hpp"
 #include "ppm.hpp"
-#include "../mfem/mfem-4.8/mfem.hpp"
+#include "mfem.hpp"
 #include <fstream>
 
 int main(int argc, char *argv[]) {
