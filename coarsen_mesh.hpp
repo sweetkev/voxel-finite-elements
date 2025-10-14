@@ -1,3 +1,5 @@
 #include "mfem.hpp"
+#include <tuple>
+#include <string>
 
-void coarsenMesh(Mesh fine_mesh);
+std::tuple<std::unordered_map<std::string, int>, Mesh> coarsenMesh(Mesh *fine_mesh, int m, int n);
