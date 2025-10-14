@@ -25,5 +25,5 @@ int main(int argc, char *argv[]) {
     std::tie(coord_to_fine_vertex, fine_mesh) = makeMesh(image);
 
     //coarsen mesh
-    coarsenMesh(&fine_mesh, image.Width(), image.Height());
+    //coarsenMesh(&fine_mesh, image.Width(), image.Height());
 }

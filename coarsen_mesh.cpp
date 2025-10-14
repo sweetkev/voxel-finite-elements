@@ -12,13 +12,13 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> coarsenMesh(Mesh *fine_me
     int dim = 2, sdim = 2;
 
     //map that takes a coordinate pair to a vertex number
-    std::unordered_map<std::string, int> coord_to_coarse_vertex = findCoarseVertices(&fine_mesh, m, n);
+    std::unordered_map<std::string, int> coord_to_coarse_vertex = findCoarseVertices(fine_mesh, m, n);
 
     //number of vertices
     int nv = coord_to_coarse_vertex.size();
 
     //find number of elements
-    int ne = numCoarseElements(&fine_mesh, m, n);
+    int ne = numCoarseElements(fine_mesh, m, n);
 
     //ignoring boundary for now
     int nb = 0;
@@ -30,4 +30,12 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> coarsenMesh(Mesh *fine_me
     Mesh coarse_mesh;
 
     return std::make_tuple(coord_to_coarse_vertex, coarse_mesh);
+}
+
+std::unordered_map<std::string, int> findCoarseVertices(Mesh *fine_mesh, int m, int n) {
+
+}
+
+int numCoarseElements(Mesh *fine_mesh, int m, int n) {
+
 }
