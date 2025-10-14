@@ -22,7 +22,7 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image
     //find number of elements
     int ne = numElements(image);
 
-    //ignoring boundary for now
+    //ignoring boundary for now. Handled by FinalizeMesh later
     int nb = 0;
 
     //initialize mesh
