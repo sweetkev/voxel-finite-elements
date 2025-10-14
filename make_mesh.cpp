@@ -2,7 +2,6 @@
 #include "ppm.hpp"
 #include "mfem.hpp"
 #include <iostream>
-#include <fstream>
 #include <unordered_map>
 #include <tuple>
 
@@ -29,29 +28,11 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image
     //initialize mesh
     Mesh mesh(dim, nv, ne, nb, sdim);
 
-    //add vertices (uses integer coordinates, so each pixel will be 1x1)
-    for(int j = 0; j < n+1; j++) {
-        for(int i = 0; i < m+1; i++) {
-            std::string coord = std::to_string(i) + " " + std::to_string(j);
-            if(coord_to_vertex.count(coord) != 0) {
-                mesh.AddVertex(i,n-j);
-            }
-        }
-    }
+    //add vertices
+    addVertices(mesh, m, n, coord_to_vertex);
 
     //add quads
-    for(int j = 0; j < n; j++) {
-        for(int i = 0; i < m; i++) {
-            //add quad for filled in pixels
-            if(image.operator()(i,j) != 0) {
-                int v1 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j)];
-                int v2 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j+1)];
-                int v3 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j+1)];
-                int v4 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j)];
-                mesh.AddQuad(v1,v2,v3,v4);
-            }
-        }
-    }
+    addQuads(image, mesh, m, n, coord_to_vertex);
 
     mesh.Finalize();
     mesh.Save("fine_mesh.mesh");
@@ -149,4 +130,33 @@ std::unordered_map<std::string, int> findVertices(PixelImage image) {
     }
 
     return coord_to_vertex;
+}
+
+/*
+adds vertices to mesh at integer indicies, so pixels will be 1x1
+*/
+void addVertices(Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex) {
+    for(int j = 0; j < n+1; j++) {
+        for(int i = 0; i < m+1; i++) {
+            std::string coord = std::to_string(i) + " " + std::to_string(j);
+            if(coord_to_vertex.count(coord) != 0) {
+                mesh.AddVertex(i,n-j);
+            }
+        }
+    }
+}
+
+void addQuads(PixelImage image, Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex) {
+    for(int j = 0; j < n; j++) {
+        for(int i = 0; i < m; i++) {
+            //add quad for filled in pixels
+            if(image.operator()(i,j) != 0) {
+                int v1 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j)];
+                int v2 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j+1)];
+                int v3 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j+1)];
+                int v4 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j)];
+                mesh.AddQuad(v1,v2,v3,v4);
+            }
+        }
+    }
 }
