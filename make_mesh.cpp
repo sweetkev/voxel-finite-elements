@@ -4,12 +4,11 @@
 #include <iostream>
 #include <fstream>
 #include <unordered_map>
+#include <tuple>
 
 using namespace mfem;
 
-std::unordered_map<std::string, int> makeMesh(std::string pgm_file) {
-    //make PixelImage
-    PixelImage image(pgm_file);
+std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image) {
     int m = image.Width(), n = image.Height(); 
     
     //dimension of domain and ambient space
@@ -57,7 +56,7 @@ std::unordered_map<std::string, int> makeMesh(std::string pgm_file) {
     mesh.Finalize();
     mesh.Save("fine_mesh.mesh");
 
-    return coord_to_vertex;
+    return std::make_tuple(coord_to_vertex, mesh);
 }
 
 /*

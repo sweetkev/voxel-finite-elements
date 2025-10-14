@@ -8,9 +8,9 @@
 
 using namespace mfem;
 
+std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image);
 bool adjacentPixelFilled(int i, int j, PixelImage image);
 int numElements(PixelImage image);
-std::unordered_map<std::string, int> makeMesh(std::string pgm_file);
 std::unordered_map<std::string, int> findVertices(PixelImage image);
 
 #endif
