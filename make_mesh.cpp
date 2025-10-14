@@ -34,7 +34,7 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image
     //add quads
     addQuads(image, mesh, m, n, coord_to_vertex);
 
-    mesh.Finalize();
+    mesh.FinalizeMesh();
     mesh.Save("fine_mesh.mesh");
 
     return std::make_tuple(coord_to_vertex, mesh);
