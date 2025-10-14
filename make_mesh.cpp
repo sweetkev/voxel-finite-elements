@@ -146,6 +146,9 @@ void addVertices(Mesh &mesh, int m, int n, std::unordered_map<std::string, int> 
     }
 }
 
+/*
+adds quads for filled pixels
+*/
 void addQuads(PixelImage image, Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex) {
     for(int j = 0; j < n; j++) {
         for(int i = 0; i < m; i++) {
