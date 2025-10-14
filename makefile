@@ -12,5 +12,5 @@ INC = -I$(MFEM_DIR)
 
 .PHONY: clean
 
-pixels: pixels.cpp ppm.cpp make_mesh.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(INC) $< ppm.cpp make_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+pixels: pixels.cpp ppm.cpp make_mesh.cpp coarsen_mesh.cpp
+	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(INC) $< ppm.cpp make_mesh.cpp coarsen_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)

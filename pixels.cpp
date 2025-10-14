@@ -1,4 +1,5 @@
 #include "make_mesh.hpp"
+#include "coarsen_mesh.hpp"
 #include "ppm.hpp"
 #include "mfem.hpp"
 #include <fstream>

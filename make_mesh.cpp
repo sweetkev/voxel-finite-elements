@@ -2,32 +2,25 @@
 #include "ppm.hpp"
 #include "mfem.hpp"
 #include <iostream>
-#include <string>
+#include <fstream>
+#include <unordered_map>
 
 using namespace mfem;
 
-void makeMesh(std::string pgm_file) {
+std::unordered_map<std::string, int> makeMesh(std::string pgm_file) {
     //make PixelImage
     PixelImage image(pgm_file);
     int m = image.Width(), n = image.Height(); 
     
-    
     //dimension of domain and ambient space
     int dim = 2, sdim = 2;
 
-    //find number of vertices, and start of index in each row stored in an array
-    //the entry in r_start[j] gives the index of the first vertex in row j
-    int r_start[n+1];                                                   
-    int nv = 0;
-    for(int j = 0; j < n+1; j++) {
-        r_start[j] = nv;
-        for(int i = 0; i < m+1; i++) {
-            if(adjacentPixelFilled(i,j,image)) {
-                nv++;
-            }
-        }
-    }
-    
+    //map that takes a coordinate pair to a vertex number
+    std::unordered_map<std::string, int> coord_to_vertex = findVertices(image);
+
+    //number of vertices
+    int nv = coord_to_vertex.size();
+
     //find number of elements
     int ne = numElements(image);
 
@@ -40,39 +33,31 @@ void makeMesh(std::string pgm_file) {
     //add vertices (uses integer coordinates, so each pixel will be 1x1)
     for(int j = 0; j < n+1; j++) {
         for(int i = 0; i < m+1; i++) {
-            if(adjacentPixelFilled(i,j,image)) {
+            std::string coord = std::to_string(i) + " " + std::to_string(j);
+            if(coord_to_vertex.count(coord) != 0) {
                 mesh.AddVertex(i,n-j);
             }
         }
     }
 
     //add quads
-    int ui = 0;
-    int di = 0;
     for(int j = 0; j < n; j++) {
-        //"upper index" and "down index". Keeps track of vertex index in rows of vertices above and below pixels.
-        ui = 0;
-        di = 0;
         for(int i = 0; i < m; i++) {
             //add quad for filled in pixels
             if(image.operator()(i,j) != 0) {
-                mesh.AddQuad(r_start[j+1]+di, r_start[j+1]+di+1, r_start[j]+ui+1, r_start[j]+ui);
-                ui++;
-                di++;
-                continue;
-            }
-
-            //if current pixel is not filled in, we progress down and upper indices left-side vertices are used by adjacent pixels
-            if(adjacentPixelFilled(i,j,image)) {
-                ui++;
-            }
-            if(adjacentPixelFilled(i,j+1,image)) {
-                di++;
+                int v1 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j)];
+                int v2 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j+1)];
+                int v3 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j+1)];
+                int v4 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j)];
+                mesh.AddQuad(v1,v2,v3,v4);
             }
         }
     }
 
-    mesh.Save("mesh.mesh");
+    mesh.Finalize();
+    mesh.Save("fine_mesh.mesh");
+
+    return coord_to_vertex;
 }
 
 /*
@@ -144,4 +129,25 @@ int numElements(PixelImage image) {
     }
 
     return ne;
+}
+
+/*
+returns an unordered map that maps coordinate values to vertices
+*/
+std::unordered_map<std::string, int> findVertices(PixelImage image) {
+    int m = image.Width(), n = image.Height();
+    std::unordered_map<std::string, int> coord_to_vertex;
+    int vertex = 0;
+
+    for(int j = 0; j < n+1; j++) {
+        for(int i = 0; i < m+1; i++) {
+            if(adjacentPixelFilled(i,j,image)) {
+                std::string coord = std::to_string(i) + " " + std::to_string(j);
+                coord_to_vertex.insert({coord, vertex});
+                vertex++;
+            }
+        }
+    }
+
+    return coord_to_vertex;
 }
