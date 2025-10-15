@@ -13,7 +13,7 @@
 #define PPM_HPP
 
 //ensure path to mfem.hpp is correct
-#include "../mfem/mfem-4.8/mfem.hpp"
+#include "mfem.hpp"
 
 namespace mfem
 {
