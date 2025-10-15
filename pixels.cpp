@@ -25,5 +25,7 @@ int main(int argc, char *argv[]) {
     std::tie(coord_to_fine_vertex, fine_mesh) = makeMesh(image);
 
     //coarsen mesh
-    //coarsenMesh(&fine_mesh, image.Width(), image.Height());
+    std::unordered_map<std::string, int> coord_to_coarse_vertex;
+    Mesh coarse_mesh;
+    std::tie(coord_to_coarse_vertex, coarse_mesh) = coarsenMesh(image.Width(), image.Height(), coord_to_fine_vertex);
 }

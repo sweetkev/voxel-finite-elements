@@ -12,9 +12,7 @@ using namespace mfem;
 
 std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image);
 bool adjacentPixelFilled(int i, int j, PixelImage image);
-int numElements(PixelImage image);
-std::unordered_map<std::string, int> findVertices(PixelImage image);
-void addVertices(Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex);
+std::unordered_map<std::string, int> addVertices(PixelImage image, Mesh &mesh, int m, int n);
 void addQuads(PixelImage image, Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex);
 
 #endif

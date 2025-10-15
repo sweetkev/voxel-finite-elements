@@ -13,23 +13,16 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image
     //dimension of domain and ambient space
     int dim = 2, sdim = 2;
 
-    //map that takes a coordinate pair to a vertex number
-    std::unordered_map<std::string, int> coord_to_vertex = findVertices(image);
-
-    //number of vertices
-    int nv = coord_to_vertex.size();
-
-    //find number of elements
-    int ne = numElements(image);
-
-    //ignoring boundary for now. Handled by FinalizeMesh later
+    //number of vertices, elements, and boundary elements. Will be allocated by FinalizeMesh() later
+    int nv = 0;
+    int ne = 0;
     int nb = 0;
 
     //initialize mesh
     Mesh mesh(dim, nv, ne, nb, sdim);
 
     //add vertices
-    addVertices(mesh, m, n, coord_to_vertex);
+    std::unordered_map<std::string, int> coord_to_vertex = addVertices(image, mesh, m, n);
 
     //add quads
     addQuads(image, mesh, m, n, coord_to_vertex);
@@ -41,7 +34,7 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> makeMesh(PixelImage image
 }
 
 /*
-returns true when a pixel adjacent to vertex is filled in
+returns true when a pixel adjacent to vertex is filled in. Else returns false.
 */
 bool adjacentPixelFilled(int i, int j, PixelImage image) {
     int m = image.Width(), n = image.Height();
@@ -94,34 +87,16 @@ bool adjacentPixelFilled(int i, int j, PixelImage image) {
 }
 
 /*
-returns number of elements in mesh generated from image
+adds vertices to mesh at integer indicies, so pixels will be 1x1. Returns map taking coordinates to vertex number.
 */
-int numElements(PixelImage image) {
-    int m = image.Width(), n = image.Height();
-
-    int ne = 0;
-    for(int i = 0; i < m; i++) {
-        for(int j = 0; j < n; j++) {
-            if(image.operator()(i,j) != 0) {
-                ne++;
-            }
-        }
-    }
-
-    return ne;
-}
-
-/*
-returns an unordered map that maps coordinate values to vertices
-*/
-std::unordered_map<std::string, int> findVertices(PixelImage image) {
-    int m = image.Width(), n = image.Height();
+std::unordered_map<std::string, int> addVertices(PixelImage image, Mesh &mesh, int m, int n) {
     std::unordered_map<std::string, int> coord_to_vertex;
-    int vertex = 0;
 
+    int vertex = 0;
     for(int j = 0; j < n+1; j++) {
         for(int i = 0; i < m+1; i++) {
             if(adjacentPixelFilled(i,j,image)) {
+                mesh.AddVertex(i,n-j);
                 std::string coord = std::to_string(i) + " " + std::to_string(j);
                 coord_to_vertex.insert({coord, vertex});
                 vertex++;
@@ -130,20 +105,6 @@ std::unordered_map<std::string, int> findVertices(PixelImage image) {
     }
 
     return coord_to_vertex;
-}
-
-/*
-adds vertices to mesh at integer indicies, so pixels will be 1x1
-*/
-void addVertices(Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex) {
-    for(int j = 0; j < n+1; j++) {
-        for(int i = 0; i < m+1; i++) {
-            std::string coord = std::to_string(i) + " " + std::to_string(j);
-            if(coord_to_vertex.count(coord) != 0) {
-                mesh.AddVertex(i,n-j);
-            }
-        }
-    }
 }
 
 /*
