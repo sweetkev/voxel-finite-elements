@@ -1,7 +1,6 @@
-#include "make_mesh.hpp"
-#include "coarsen_mesh.hpp"
 #include "ppm.hpp"
 #include "mfem.hpp"
+#include "pixel_mesh.hpp"
 #include <fstream>
 #include <unordered_map>
 #include <tuple>
@@ -16,16 +15,9 @@ int main(int argc, char *argv[]) {
     args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
     args.ParseCheck();
 
-    //make PixelImage
-    PixelImage image(pgm_file);
-
-    //make fine mesh from image
-    std::unordered_map<std::string, int> coord_to_fine_vertex;
-    Mesh fine_mesh;
-    std::tie(coord_to_fine_vertex, fine_mesh) = makeMesh(image);
+    //make mesh from file
+    PixelMesh fine_mesh(pgm_file);
 
     //coarsen mesh
-    std::unordered_map<std::string, int> coord_to_coarse_vertex;
-    Mesh coarse_mesh;
-    std::tie(coord_to_coarse_vertex, coarse_mesh) = coarsenMesh(image.Width(), image.Height(), coord_to_fine_vertex);
+    PixelMesh coarse_mesh = fine_mesh.CoarsenMesh();
 }
