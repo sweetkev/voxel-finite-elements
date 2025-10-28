@@ -18,9 +18,6 @@ PixelMesh::PixelMesh(Mesh &mesh_, std::unordered_map<std::string, int> coord_to_
     : mesh(mesh_), coord_to_vertex(coord_to_vertex_), width(width_), height(height_) 
 {}
 
-/*
-Creates coarse mesh from current mesh
-*/
 PixelMesh PixelMesh::CoarsenMesh() {
     int m = width, n = height;
     std::unordered_map<std::string, int> coord_to_fine_vertex = coord_to_vertex;
@@ -49,9 +46,6 @@ PixelMesh PixelMesh::CoarsenMesh() {
     return p_mesh;
 }
 
-/*
-makes mesh given PixelImage, with elements given by filled-in pixels
-*/
 std::tuple<std::unordered_map<std::string, int>, Mesh> PixelMesh::MakeMesh(PixelImage image) {
     int m = image.Width(), n = image.Height(); 
     
@@ -78,9 +72,6 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> PixelMesh::MakeMesh(Pixel
     return std::make_tuple(coord_to_vertex, fine_mesh);
 }
 
-/*
-returns true when a pixel adjacent to vertex is filled in. Else returns false.
-*/
 bool PixelMesh::AdjacentPixelFilled(int i, int j, PixelImage image) {
     int m = image.Width(), n = image.Height();
 
@@ -131,9 +122,6 @@ bool PixelMesh::AdjacentPixelFilled(int i, int j, PixelImage image) {
     }
 }
 
-/*
-adds vertices to mesh at integer indicies, so pixels will be 1x1. Returns map taking coordinates to vertex number.
-*/
 std::unordered_map<std::string, int> PixelMesh::AddVertices(PixelImage image, Mesh &mesh, int m, int n) {
     std::unordered_map<std::string, int> coord_to_vertex;
 
@@ -152,9 +140,6 @@ std::unordered_map<std::string, int> PixelMesh::AddVertices(PixelImage image, Me
     return coord_to_vertex;
 }
 
-/*
-adds quads for filled pixels
-*/
 void PixelMesh::AddQuads(PixelImage image, Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex) {
     for(int j = 0; j < n; j++) {
         for(int i = 0; i < m; i++) {
@@ -170,9 +155,6 @@ void PixelMesh::AddQuads(PixelImage image, Mesh &mesh, int m, int n, std::unorde
     }
 }
 
-/*
-returns true if any adjacent coarse pixel should be filled in. Else returns false
-*/
 bool PixelMesh::PixelNearby(int i, int j, std::unordered_map<std::string, int> coord_to_fine_vertex) {
     std::string coord1 = std::to_string(2*i - 1) + " " + std::to_string(2*j - 1);
     std::string coord2 = std::to_string(2*i + 1) + " " + std::to_string(2*j - 1);
@@ -185,9 +167,6 @@ bool PixelMesh::PixelNearby(int i, int j, std::unordered_map<std::string, int> c
     return false;
 }
 
-/*
-returns unorderd map that takes coordinates to coarse vertex, and adds vertices to coarse mesh
-*/
 std::unordered_map<std::string, int> PixelMesh::AddCoarseVertices(Mesh &coarse_mesh, int m, int n, std::unordered_map<std::string, int> coord_to_fine_vertex) {
     int p = std::ceil(0.5*(m+1)), q = std::ceil(0.5*(n+1));
 
@@ -208,9 +187,6 @@ std::unordered_map<std::string, int> PixelMesh::AddCoarseVertices(Mesh &coarse_m
     return coord_to_coarse_vertex;
 }
 
-/*
-adds quads to coarse mesh
-*/
 void PixelMesh::AddCoarseQuads(Mesh &coarse_mesh, int m, int n, std::unordered_map<std::string, int> coord_to_fine_vertex, std::unordered_map<std::string, int> coord_to_coarse_vertex) {
     int p = std::ceil(0.5*m), q = std::ceil(0.5*n);
     
