@@ -46,6 +46,11 @@ PixelMesh PixelMesh::CoarsenMesh() {
     return p_mesh;
 }
 
+SparseMatrix PixelMesh::CreateProlongation(std::unordered_map<std::string, int> fine_coord_to_vertex) {
+    SparseMatrix A;
+    return A;
+}
+
 std::tuple<std::unordered_map<std::string, int>, Mesh> PixelMesh::MakeMesh(PixelImage image) {
     int m = image.Width(), n = image.Height(); 
     
