@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
    Array<int> fine_ess_dofs;
    fine_fes.GetBoundaryTrueDofs(fine_ess_dofs);
 
-   BilinearForm fine_a(&fespace);
+   BilinearForm fine_a(&fine_fes);
    fine_a.AddDomainIntegrator(new DiffusionIntegrator);
    fine_a.Assemble();
    SparseMatrix fine_A;
@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
    Array<int> coarse_ess_dofs;
    coarse_fes.GetBoundaryTrueDofs(coarse_ess_dofs);
 
-   BilinearForm coarse_a(&fespace);
+   BilinearForm coarse_a(&coarse_fes);
    coarse_a.AddDomainIntegrator(new DiffusionIntegrator);
    coarse_a.Assemble();
    SparseMatrix coarse_A;

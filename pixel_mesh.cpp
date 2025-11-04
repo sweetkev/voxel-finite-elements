@@ -46,7 +46,7 @@ PixelMesh PixelMesh::CoarsenMesh() {
     return p_mesh;
 }
 
-SparseMatrix PixelMesh::CreateProlongation(std::unordered_map<std::string, int> fine_coord_to_vertex) {
+SparseMatrix PixelMesh::CreateProlongation(PixelMesh fine_mesh) {
     SparseMatrix A;
     return A;
 }

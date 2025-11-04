@@ -15,8 +15,8 @@ class PixelMesh
         /** Creates coarse mesh from current mesh */
         PixelMesh CoarsenMesh();
 
-        /** Creates prolongation map from current mesh to finer mesh, given the finer mesh's coordinate pair to vertex map */
-        SparseMatrix CreateProlongation(std::unordered_map<std::string, int> fine_coord_to_vertex);
+        /** Creates prolongation map from current mesh to finer mesh */
+        SparseMatrix CreateProlongation(PixelMesh fine_mesh);
 
         /** Returns associated mesh */
         Mesh& GetMesh() { return mesh; }
