@@ -1,4 +1,5 @@
 MFEM_DIR = ${HOME}/mfem/mfem-4.8
+SUITESPARSE_DIR = /usr/include/suitesparse
 
 ifndef MFEM_DIR
 $(error MFEM_DIR is not set)
@@ -6,7 +7,7 @@ endif
 
 MFEM_BUILD_DIR = $(MFEM_DIR)
 CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
-INC = -I$(MFEM_DIR) -I/usr/include/suitesparse
+INC = -I$(MFEM_DIR) -I$(SUITESPARSE_DIR)
 
 -include $(CONFIG_MK)
 
