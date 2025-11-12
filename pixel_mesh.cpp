@@ -42,18 +42,38 @@ PixelMesh PixelMesh::CoarsenMesh() {
     coarse_mesh.FinalizeMesh();
     coarse_mesh.Save("coarse_mesh.mesh");
 
-    PixelMesh p_mesh(coarse_mesh, coord_to_coarse_vertex, m, n);
-    return p_mesh;
+    PixelMesh c_mesh(coarse_mesh, coord_to_coarse_vertex, m, n);
+    return c_mesh;
 }
 
 SparseMatrix PixelMesh::CreateProlongation(PixelMesh fine_mesh) {
-    SparseMatrix A;
-    return A;
+    std::unordered_map<std::string, int> fine_coord_to_vertex = fine_mesh.GetVertexMap();
+    
+    //initialize matrix
+    int nrows = fine_coord_to_vertex.size();
+    int ncols = coord_to_vertex.size();
+    SparseMatrix P(nrows,ncols);
+
+    //add entries
+    int p = std::ceil(0.5*(width))+1, q = std::ceil(0.5*(height))+1;
+
+    int vertex = 0;
+    for(int j = 0; j < q; j++) {
+        for(int i = 0; i < p; i++) { 
+            int x = 2*i, y = 2*(q-j-1);
+            std::string coord = std::to_string(x) + " " + std::to_string(y);
+            if(coord_to_vertex.count(coord) != 0) {
+                AddVertexInfluence(x,y,P,fine_coord_to_vertex);
+            }
+        }
+    }
+
+    //finalize and return
+    P.Finalize();
+    return P;
 }
 
-std::tuple<std::unordered_map<std::string, int>, Mesh> PixelMesh::MakeMesh(PixelImage image) {
-    int m = image.Width(), n = image.Height(); 
-    
+std::tuple<std::unordered_map<std::string, int>, Mesh> PixelMesh::MakeMesh(PixelImage image) { 
     //dimension of domain and ambient space
     int dim = 2, sdim = 2;
 
@@ -66,6 +86,7 @@ std::tuple<std::unordered_map<std::string, int>, Mesh> PixelMesh::MakeMesh(Pixel
     Mesh fine_mesh(dim, nv, ne, nb, sdim);
 
     //add vertices
+    int m = image.Width(), n = image.Height();
     std::unordered_map<std::string, int> coord_to_vertex = AddVertices(image, fine_mesh, m, n);
 
     //add quads
@@ -134,8 +155,9 @@ std::unordered_map<std::string, int> PixelMesh::AddVertices(PixelImage image, Me
     for(int j = 0; j < n+1; j++) {
         for(int i = 0; i < m+1; i++) {
             if(AdjacentPixelFilled(i,j,image)) {
-                mesh.AddVertex(i,n-j);
-                std::string coord = std::to_string(i) + " " + std::to_string(j);
+                int x = i, y = n-j;
+                mesh.AddVertex(x,y);
+                std::string coord = std::to_string(x) + " " + std::to_string(y);
                 coord_to_vertex.insert({coord, vertex});
                 vertex++;
             }
@@ -150,21 +172,22 @@ void PixelMesh::AddQuads(PixelImage image, Mesh &mesh, int m, int n, std::unorde
         for(int i = 0; i < m; i++) {
             //add quad for filled in pixels
             if(image.operator()(i,j) != 0) {
-                int v1 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j)];
-                int v2 = coord_to_vertex[std::to_string(i) + " " + std::to_string(j+1)];
-                int v3 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j+1)];
-                int v4 = coord_to_vertex[std::to_string(i+1) + " " + std::to_string(j)];
+                int x = i, y = n-j;
+                int v1 = coord_to_vertex[std::to_string(x) + " " + std::to_string(y)];
+                int v2 = coord_to_vertex[std::to_string(x) + " " + std::to_string(y-1)];
+                int v3 = coord_to_vertex[std::to_string(x+1) + " " + std::to_string(y-1)];
+                int v4 = coord_to_vertex[std::to_string(x+1) + " " + std::to_string(y)];
                 mesh.AddQuad(v1,v2,v3,v4);
             }
         }
     }
 }
 
-bool PixelMesh::PixelNearby(int i, int j, std::unordered_map<std::string, int> coord_to_fine_vertex) {
-    std::string coord1 = std::to_string(2*i - 1) + " " + std::to_string(2*j - 1);
-    std::string coord2 = std::to_string(2*i + 1) + " " + std::to_string(2*j - 1);
-    std::string coord3 = std::to_string(2*i + 1) + " " + std::to_string(2*j + 1);
-    std::string coord4 = std::to_string(2*i - 1) + " " + std::to_string(2*j + 1);
+bool PixelMesh::PixelNearby(int x, int y, std::unordered_map<std::string, int> coord_to_fine_vertex) {
+    std::string coord1 = std::to_string(x - 1) + " " + std::to_string(y - 1);
+    std::string coord2 = std::to_string(x + 1) + " " + std::to_string(y - 1);
+    std::string coord3 = std::to_string(x + 1) + " " + std::to_string(y + 1);
+    std::string coord4 = std::to_string(x - 1) + " " + std::to_string(y + 1);
     if((coord_to_fine_vertex.count(coord1) != 0) || (coord_to_fine_vertex.count(coord2) != 0) || (coord_to_fine_vertex.count(coord3) != 0) || (coord_to_fine_vertex.count(coord4) != 0)) {
         return true;
     }
@@ -173,16 +196,17 @@ bool PixelMesh::PixelNearby(int i, int j, std::unordered_map<std::string, int> c
 }
 
 std::unordered_map<std::string, int> PixelMesh::AddCoarseVertices(Mesh &coarse_mesh, int m, int n, std::unordered_map<std::string, int> coord_to_fine_vertex) {
-    int p = std::ceil(0.5*(m+1)), q = std::ceil(0.5*(n+1));
+    int p = std::ceil(0.5*(m))+1, q = std::ceil(0.5*(n))+1;
 
     std::unordered_map<std::string, int> coord_to_coarse_vertex;
 
     int vertex = 0;
     for(int j = 0; j < q; j++) {
         for(int i = 0; i < p; i++) {
-            std::string coord = std::to_string(2*i) + " " + std::to_string(2*j);
-            if(PixelNearby(i,j,coord_to_fine_vertex)) {
-                coarse_mesh.AddVertex(2*i,(2*(q-j-1)));
+            int x = 2*i, y = 2*(q-j-1);
+            std::string coord = std::to_string(x) + " " + std::to_string(y);
+            if(PixelNearby(x,y,coord_to_fine_vertex)) {
+                coarse_mesh.AddVertex(x,y);
                 coord_to_coarse_vertex.insert({coord,vertex});
                 vertex++;
             }
@@ -198,14 +222,86 @@ void PixelMesh::AddCoarseQuads(Mesh &coarse_mesh, int m, int n, std::unordered_m
     for(int j = 0; j < q; j++) {
         for(int i = 0; i < p; i++) {
             //add quad for filled in pixels
-            std::string coord = std::to_string(2*i+1) + " " + std::to_string(2*j+1);
+            int x = 2*i, y = 2*(q-j-1);
+            std::string coord = std::to_string(x+1) + " " + std::to_string(y-1);
             if(coord_to_fine_vertex.count(coord) != 0) {
-                int v1 = coord_to_coarse_vertex[std::to_string(2*i) + " " + std::to_string(2*j)];
-                int v2 = coord_to_coarse_vertex[std::to_string(2*i) + " " + std::to_string(2*(j+1))];
-                int v3 = coord_to_coarse_vertex[std::to_string(2*(i+1)) + " " + std::to_string(2*(j+1))];
-                int v4 = coord_to_coarse_vertex[std::to_string(2*(i+1)) + " " + std::to_string(2*j)];
+                int v1 = coord_to_coarse_vertex[std::to_string(x) + " " + std::to_string(y)];
+                int v2 = coord_to_coarse_vertex[std::to_string(x) + " " + std::to_string(y-2)];
+                int v3 = coord_to_coarse_vertex[std::to_string(x+2) + " " + std::to_string(y-2)];
+                int v4 = coord_to_coarse_vertex[std::to_string(x+2) + " " + std::to_string(y)];
                 coarse_mesh.AddQuad(v1,v2,v3,v4);
             }
         }
+    }
+}
+
+void PixelMesh::AddVertexInfluence(int x, int y, SparseMatrix &P, std::unordered_map<std::string, int> fine_coord_to_vertex) {
+    std::string coarse_coord = std::to_string(x) + " " + std::to_string(y);
+    int i,j;
+    j = coord_to_vertex[coarse_coord];
+    
+    std::string coord;
+
+    //current (middle middle) vertex
+    coord = coarse_coord;
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,1);
+    }
+    
+    //bottom left vertex
+    coord = std::to_string(x-1) + " " + std::to_string(y-1);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.25);
+    }
+
+    //bottom middle vertex
+    coord = std::to_string(x) + " " + std::to_string(y-1);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.5);
+    }
+
+    //bottom right vertex
+    coord = std::to_string(x+1) + " " + std::to_string(y-1);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.25);
+    }
+
+    //middle left vertex
+    coord = std::to_string(x-1) + " " + std::to_string(y);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.5);
+    }
+
+    //middle right vertex
+    coord = std::to_string(x+1) + " " + std::to_string(y);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.5);
+    }
+
+    //top left vertex
+    coord = std::to_string(x-1) + " " + std::to_string(y+1);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.25);
+    }
+
+    //top middle vertex
+    coord = std::to_string(x) + " " + std::to_string(y+1);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.5);
+    }
+
+    //top right vertex
+    coord = std::to_string(x+1) + " " + std::to_string(y+1);
+    if(fine_coord_to_vertex.count(coord) != 0) {
+        i = fine_coord_to_vertex[coord];
+        P.Add(i,j,0.25);
     }
 }

@@ -6,7 +6,7 @@ endif
 
 MFEM_BUILD_DIR = $(MFEM_DIR)
 CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
-INC = -I$(MFEM_DIR)
+INC = -I$(MFEM_DIR) -I/usr/include/suitesparse
 
 -include $(CONFIG_MK)
 

@@ -43,11 +43,17 @@ class PixelMesh
         void AddQuads(PixelImage image, Mesh &mesh, int m, int n, std::unordered_map<std::string, int> coord_to_vertex);
 
         /** Returns true if any adjacent coarse pixel should be filled in. Else returns false */
-        bool PixelNearby(int i, int j, std::unordered_map<std::string, int> coord_to_fine_vertex);
+        bool PixelNearby(int x, int y, std::unordered_map<std::string, int> coord_to_fine_vertex);
         
         /** Returns unorderd map that takes coordinates to coarse vertex, and adds vertices to coarse mesh */
         std::unordered_map<std::string, int> AddCoarseVertices(Mesh &coarse_mesh, int m, int n, std::unordered_map<std::string, int> coord_to_fine_vertex);
         
         /** Adds quads to coarse mesh for filled pixels */
         void AddCoarseQuads(Mesh &coarse_mesh, int m, int n, std::unordered_map<std::string, int> coord_to_fine_vertex, std::unordered_map<std::string, int> coord_to_coarse_vertex);
+
+        /** Adds the influence of a vertex in the fine mesh to the prolongation matrix P */
+        void AddVertexInfluence(int x, int y, SparseMatrix &P, std::unordered_map<std::string, int> fine_coord_to_vertex);
+
+        /** Returns true if vertex (x,y) lies on boundary of fine mesh */
+        bool OnFineBoundary(int x, int y, std::unordered_map<std::string, int> fine_coord_to_vertex);
 };

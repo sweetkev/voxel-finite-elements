@@ -7,6 +7,8 @@
 
 using namespace mfem;
 
+void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs);
+
 int main(int argc, char *argv[])
 {
    //parse options
@@ -24,11 +26,10 @@ int main(int argc, char *argv[])
 
    const int order = 1;
 
+   //setup finite element spaces
    H1_FECollection fec(order, fine_mesh.GetMesh().Dimension());
    FiniteElementSpace fine_fes(&fine_mesh.GetMesh(), &fec);
    FiniteElementSpace coarse_fes(&coarse_mesh.GetMesh(), &fec);
-
-   const int nlevels = 2;
 
    Array<int> fine_ess_dofs;
    fine_fes.GetBoundaryTrueDofs(fine_ess_dofs);
@@ -48,6 +49,8 @@ int main(int argc, char *argv[])
    SparseMatrix coarse_A;
    coarse_a.FormSystemMatrix(coarse_ess_dofs, coarse_A);
 
+   //create multigrid operators
+   const int nlevels = 2;
    Array<Operator*> operators(nlevels);
    Array<Solver*> smoothers(nlevels);
    Array<Operator*> prolongations(nlevels - 1);
@@ -62,37 +65,35 @@ int main(int argc, char *argv[])
    operators[0] = &coarse_A;
    operators[1] = &fine_A;
 
+   UMFPackSolver coarse_solver(coarse_A);
+   DSmoother fine_smoother(fine_A);
+   smoothers[0] = &coarse_solver;
+   smoothers[1] = &fine_smoother;
+   
+   SparseMatrix P = coarse_mesh.CreateProlongation(fine_mesh);
+   AddProlongationBCs(P,fine_ess_dofs);
+
+   prolongations[0] = &P;
+
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
 
-   /*
-
-   //Define finite elment space on fine mesh
-   H1_FECollection fec(1,2);
-   FiniteElementSpace fespace(&fine_mesh.GetMesh(), &fec);
-
-   //Get boundary dofs to enforce boundary conditions
-   Array<int> boundary_dofs;
-   fespace.GetBoundaryTrueDofs(boundary_dofs);
-
-   //setup gridfunction x
-   GridFunction x(&fespace);
+   //initial guess
+   GridFunction x(&fine_fes);
    x = 0.0;
 
-   //setup linear form b
+   //right-hand side
    ConstantCoefficient one(1.0);
-   LinearForm b(&fespace);
+   LinearForm b(&fine_fes);
    b.AddDomainIntegrator(new DomainLFIntegrator(one));
    b.Assemble();
+}
 
-   //setup multigrid
-   Multigrid m;
+/** Removes rows from prolongation P that correspond with boundary dofs */
+void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs) {
+   int nbdofs = fine_ess_dofs.Size();
 
-   //solve
-   SparseMatrix A;
-   Vector B,X;
-   m.FormLinearSystem(boundary_dofs, x, b, A, X, B);
-   m.RecoverFEMSolution(X, b, x);
-
-   */
+   for(int i=0; i < nbdofs; i++) {
+      P.EliminateRow(i);
+   }
 }
