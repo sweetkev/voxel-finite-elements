@@ -37,8 +37,20 @@ int main(int argc, char *argv[])
    BilinearForm fine_a(&fine_fes);
    fine_a.AddDomainIntegrator(new DiffusionIntegrator);
    fine_a.Assemble();
+
+   //initial guess
+   GridFunction x(&fine_fes);
+   x = 0.0;
+
+   //right-hand side
+   ConstantCoefficient one(1.0);
+   LinearForm b(&fine_fes);
+   b.AddDomainIntegrator(new DomainLFIntegrator(one));
+   b.Assemble();
+
    SparseMatrix fine_A;
-   fine_a.FormSystemMatrix(fine_ess_dofs, fine_A);
+   Vector X, B;
+   fine_a.FormLinearSystem(fine_ess_dofs, x, b, fine_A, X, B);
 
    Array<int> coarse_ess_dofs;
    coarse_fes.GetBoundaryTrueDofs(coarse_ess_dofs);
@@ -69,7 +81,7 @@ int main(int argc, char *argv[])
    DSmoother fine_smoother(fine_A);
    smoothers[0] = &coarse_solver;
    smoothers[1] = &fine_smoother;
-   
+
    SparseMatrix P = coarse_mesh.CreateProlongation(fine_mesh);
    AddProlongationBCs(P,fine_ess_dofs);
 
@@ -78,15 +90,13 @@ int main(int argc, char *argv[])
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
 
-   //initial guess
-   GridFunction x(&fine_fes);
-   x = 0.0;
-
-   //right-hand side
-   ConstantCoefficient one(1.0);
-   LinearForm b(&fine_fes);
-   b.AddDomainIntegrator(new DomainLFIntegrator(one));
-   b.Assemble();
+   CGSolver cg;
+   cg.SetRelTol(1e-12);
+   cg.SetMaxIter(2000);
+   cg.SetPrintLevel(1);
+   cg.SetOperator(fine_A);
+   cg.SetPreconditioner(mg);
+   cg.Mult(B, X);
 }
 
 /** Removes rows from prolongation P that correspond with boundary dofs */
