@@ -57,7 +57,6 @@ SparseMatrix PixelMesh::CreateProlongation(PixelMesh fine_mesh) {
     //add entries
     int p = std::ceil(0.5*(width))+1, q = std::ceil(0.5*(height))+1;
 
-    int vertex = 0;
     for(int j = 0; j < q; j++) {
         for(int i = 0; i < p; i++) { 
             int x = 2*i, y = 2*(q-j-1);
