@@ -97,6 +97,9 @@ int main(int argc, char *argv[])
    cg.SetOperator(fine_A);
    cg.SetPreconditioner(mg);
    cg.Mult(B, X);
+
+   fine_a.RecoverFEMSolution(X,b,x);
+   x.Save("sol.gf");
 }
 
 /** Removes rows from prolongation P that correspond with boundary dofs */

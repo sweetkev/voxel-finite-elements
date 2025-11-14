@@ -1,4 +1,4 @@
-MFEM_DIR = ${HOME}/mfem/mfem-4.8
+MFEM_DIR = ${HOME}/mfem/mfem
 
 ifndef MFEM_DIR
 $(error MFEM_DIR is not set)
