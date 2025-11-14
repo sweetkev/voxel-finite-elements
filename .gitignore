@@ -51,3 +51,7 @@
 # Ignore all local history of files
 .history
 .ionide
+
+# MFEM meshes and solutions
+*.mesh
+*.gf
