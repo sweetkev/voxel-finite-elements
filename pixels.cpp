@@ -108,6 +108,6 @@ void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs) {
    int nbdofs = fine_ess_dofs.Size();
 
    for(int i=0; i < nbdofs; i++) {
-      P.EliminateRow(i);
+      P.EliminateRow(fine_ess_dofs[i]);
    }
 }
