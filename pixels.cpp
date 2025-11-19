@@ -100,6 +100,7 @@ int main(int argc, char *argv[])
 
    fine_a.RecoverFEMSolution(X,b,x);
    x.Save("sol.gf");
+   fine_mesh.GetMesh().Save("fine_mesh.mesh");
 }
 
 /** Removes rows from prolongation P that correspond with boundary dofs */
