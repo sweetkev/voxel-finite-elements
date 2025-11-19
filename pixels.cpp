@@ -20,9 +20,11 @@ int main(int argc, char *argv[])
 
    //make mesh from file
    PixelMesh fine_mesh(pgm_file);
+   std::cout << "fine mesh generated\n";
 
    //coarsen mesh
    PixelMesh coarse_mesh = fine_mesh.CoarsenMesh();
+   std::cout << "mesh coarsened\n";
 
    const int order = 1;
 
@@ -89,6 +91,7 @@ int main(int argc, char *argv[])
 
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
+   std::cout << "multigrid constructed\n";
 
    CGSolver cg;
    cg.SetRelTol(1e-12);
