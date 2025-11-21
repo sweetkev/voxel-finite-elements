@@ -33,7 +33,7 @@ public:
    PixelMesh(std::string pgm_file) : PixelMesh(PixelImage(pgm_file)) { }
 
    /** Returns coarsened mesh obtained from current mesh */
-   PixelMesh PixelMesh::CoarsenMesh() { return PixelMesh(image.Coarsen()); }
+   PixelMesh CoarsenMesh() { return PixelMesh(image.Coarsen()); }
 
 
    /** Returns associated mesh */
@@ -42,10 +42,10 @@ public:
    /** Returns associated mesh as const */
    const Mesh &GetMesh() const { return mesh; }
 
-   /** Returns the coordinates associated with element i */
+   /** Returns the bottom-left coordinates of element i */
    Coord GetElementCoord(int i) const { return element_to_coord.at(i); }
 
-   /** Returns the element index with coordinates coord */
+   /** Returns the element index of the elmement with bottom-left coordinates coord */
    int GetElementIndex(Coord coord) const
    {
       auto it = coord_to_element.find(coord);

@@ -24,9 +24,20 @@ int main(int argc, char *argv[])
    fine_mesh.GetMesh().Save("fine_mesh.mesh");
 
    PixelMesh coarse_mesh = fine_mesh.CoarsenMesh();
+
    coarse_mesh.GetMesh().Save("coarse_mesh.mesh");
 
-   // std::cout << "fine mesh generated\n";
+   const int order = 1;
+
+   //setup finite element spaces
+   H1_FECollection fec(order, fine_mesh.GetMesh().Dimension());
+   FiniteElementSpace fine_fes(&fine_mesh.GetMesh(), &fec);
+   FiniteElementSpace coarse_fes(&coarse_mesh.GetMesh(), &fec);
+
+   //CreatePixelProlongation(coarse_mesh, coarse_fes, fine_mesh, fine_fes);
+
+   
+   
 
    // //coarsen mesh
    // PixelMesh coarse_mesh = fine_mesh.CoarsenMesh();

@@ -164,22 +164,41 @@ PixelMesh::PixelMesh(const PixelImage &image_) : image(image_)
 //     }
 // }
 
+/* Each child index corresponds to a fine element. The sub_element_position indicates 
+   the position of the fine element in realtion to its parental coarse element. 
+   sub_element_position is lexicographic left-to-right, bottom-to-top, i.e.
+   2 3
+   0 1
+*/
 struct ChildIndex
 {
    int fine_element;
    int sub_element_position;
 };
 
+/** Returns Prolongation Matrix from a coarse mesh to a finer mesh */
 SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
                                      const FiniteElementSpace &coarse_fes,
                                      const PixelMesh &fine_mesh,
                                      const FiniteElementSpace &fine_fes)
 {
-   SparseMatrix P(fine_fes.GetTrueVSize(), coarse_fes.GetTrueVSize());
+   // Initialize prolongation matrix
+
+   int nrows = fine_fes.GetTrueVSize(), ncols = coarse_fes.GetTrueVSize();
+   SparseMatrix P(nrows,ncols);
+
+   // Organize structure between coarse element "parents" and fine element "children"
 
    const int coarse_ne = coarse_mesh.GetMesh().GetNE();
+   const int fine_ne = fine_mesh.GetMesh().GetNE();
 
-   std::vector<ChildIndex> children(fine_mesh.GetMesh().GetNE());
+   /* children and children_offsets utilize a CSR-like structure. For a 
+      coarse element i, its children can be accessed by the indicies from
+      children_offsets[i] up to (not including) children_offsets[i+1]. 
+   */
+
+
+   std::vector<ChildIndex> children(fine_ne);
    std::vector<int> children_offsets(coarse_ne + 1);
 
    int offset = 0;
@@ -212,31 +231,52 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
    // Set up the local prolongation matrices
 
    // See Mesh::UniformRefinement2D_base
-   //    static const double A = 0.0, B = 0.5, C = 1.0;
-   //    // NOTE: as opposed to Mesh::UniformRefinement2D_base, these are ordered
-   //    // lexicographically
-   //    static double quad_children[2*4*4] =
-   //    {
-   //       A,A, B,A, B,B, A,B, // lower-left
-   //       B,A, C,A, C,B, B,B, // lower-right
-   //       A,B, B,B, B,C, A,C,  // upper-left
-   //       B,B, C,B, C,C, B,C // upper-right
-   //    };
+   static const double A = 0.0, B = 0.5, C = 1.0;
+   // NOTE: as opposed to Mesh::UniformRefinement2D_base, these are ordered
+   // lexicographically
+   static double quad_children[2*4*4] =
+   {
+      A,A, B,A, B,B, A,B, // lower-left
+      B,A, C,A, C,B, B,B, // lower-right
+      A,B, B,B, B,C, A,C,  // upper-left
+      B,B, C,B, C,C, B,C // upper-right
+   };
 
-   //    const FiniteElement &fe = *coarse_fes.GetFE(0);
-   //    const int n_loc_dof = fe.GetDof();
+   const FiniteElement &fe = *coarse_fes.GetFE(0);
+   const int n_loc_dof = fe.GetDof();
 
-   //    IsoparametricTransformation isotr;
-   //    isotr.SetIdentityTransformation(fe.GetGeomType());
+   IsoparametricTransformation isotr;
+   isotr.SetIdentityTransformation(fe.GetGeomType());
 
-   //    local_P.SetSize(n_loc_dof, n_loc_dof, 4);
-   //    local_R.SetSize(n_loc_dof, n_loc_dof, 4);
-   //    for (int i = 0; i < 4; ++i)
-   //    {
-   //       DenseMatrix pmat(quad_children + i*2*4, 2, 4);
-   //       isotr.SetPointMat(pmat);
-   //       fe.GetLocalInterpolation(isotr, local_P(i));
-   //       fe.GetLocalRestriction(isotr, local_R(i));
-   //    }
+   DenseTensor local_P; // local prolongation
+   // DenseTensor local_R; // local restriction
+   local_P.SetSize(n_loc_dof, n_loc_dof, 4);
+   // local_R.SetSize(n_loc_dof, n_loc_dof, 4);
+   for (int i = 0; i < 4; ++i)
+   {
+      DenseMatrix pmat(quad_children + i*2*4, 2, 4);
+      isotr.SetPointMat(pmat);
+      fe.GetLocalInterpolation(isotr, local_P(i));
+      // fe.GetLocalRestriction(isotr, local_R(i));
+   }
+
+   for(int i = 0; i < coarse_ne; ++i) {
+      for(int j = children_offsets[i]; j < children_offsets[i+1]; ++j) {
+         ChildIndex child = children[j];
+         int child_position = child.sub_element_position;
+         int child_element = child.fine_element;
+
+         Array<int> rows, cols; 
+         fine_fes.GetElementDofs(child_element, rows);
+         coarse_fes.GetElementDofs(i, cols);
+
+         SparseMatrix temp(nrows,ncols);
+         temp.AddSubMatrix(rows,cols,local_P(child_position));
+         P.Add(1.0,temp);         
+      }
+   }
+   P.Print();
+
+   return P;
 
 }
