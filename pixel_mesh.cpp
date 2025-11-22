@@ -181,7 +181,8 @@ struct ChildIndex
 SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
                                      const FiniteElementSpace &coarse_fes,
                                      const PixelMesh &fine_mesh,
-                                     const FiniteElementSpace &fine_fes)
+                                     const FiniteElementSpace &fine_fes,
+                                     const Array<int> &fine_ess_dofs)
 {
    // Initialize prolongation matrix
 
@@ -275,6 +276,19 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
       }
    }
 
+   EnforceProlongationBCs(P,fine_ess_dofs);
+
    return P;
 
+}
+
+/** Removes rows from prolongation P that correspond with boundary dofs */
+void EnforceProlongationBCs(SparseMatrix &P, const Array<int> &fine_ess_dofs)
+{
+   int nbdofs = fine_ess_dofs.Size();
+
+   for (int i=0; i < nbdofs; i++)
+   {
+      P.EliminateRow(fine_ess_dofs[i]);
+   }
 }

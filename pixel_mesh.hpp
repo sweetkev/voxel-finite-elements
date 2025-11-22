@@ -74,4 +74,8 @@ private:
 SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
                                      const FiniteElementSpace &coarse_fes,
                                      const PixelMesh &fine_mesh,
-                                     const FiniteElementSpace &fine_fes);
+                                     const FiniteElementSpace &fine_fes,
+                                     const Array<int> &fine_ess_dofs);
+
+void EnforceProlongationBCs(SparseMatrix &P, const Array<int> &fine_ess_dofs);
+
