@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
    FiniteElementSpace fine_fes(&fine_mesh.GetMesh(), &fec);
    FiniteElementSpace coarse_fes(&coarse_mesh.GetMesh(), &fec);
 
-   //CreatePixelProlongation(coarse_mesh, coarse_fes, fine_mesh, fine_fes);
+   CreatePixelProlongation(coarse_mesh, coarse_fes, fine_mesh, fine_fes);
 
    
    

@@ -55,6 +55,7 @@ PixelMesh::PixelMesh(const PixelImage &image_) : image(image_)
             const int v3 = v1 + width + 1 + 1;
             const int v4 = v3 - 1;
             the_mesh.AddQuad(v1, v2, v3, v4);
+            e++;
          }
       }
    }
@@ -206,7 +207,7 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
    {
       children_offsets[i] = offset;
 
-      const Coord coarse_coord = coarse_mesh.GetElementCoord(i);
+      const Coord coarse_coord = coarse_mesh.GetElementCoord(i); 
       Coord fine_coord(2*coarse_coord[0], 2*coarse_coord[1]);
 
       for (int jj = 0; jj < 2; ++jj)
@@ -270,9 +271,7 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
          fine_fes.GetElementDofs(child_element, rows);
          coarse_fes.GetElementDofs(i, cols);
 
-         SparseMatrix temp(nrows,ncols);
-         temp.AddSubMatrix(rows,cols,local_P(child_position));
-         P.Add(1.0,temp);         
+         P.AddSubMatrix(rows,cols,local_P(child_position));         
       }
    }
    P.Print();
