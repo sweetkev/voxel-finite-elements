@@ -271,10 +271,9 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
          fine_fes.GetElementDofs(child_element, rows);
          coarse_fes.GetElementDofs(i, cols);
 
-         P.AddSubMatrix(rows,cols,local_P(child_position));         
+         P.SetSubMatrix(rows,cols,local_P(child_position));         
       }
    }
-   P.Print();
 
    return P;
 
