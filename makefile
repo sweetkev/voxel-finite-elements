@@ -14,5 +14,8 @@ CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
 pixels: pixels.cpp ppm.cpp pixel_mesh.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< ppm.cpp pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
 
+pixels_debug: pixels.cpp ppm.cpp pixel_mesh.cpp
+	$(MFEM_CXX) -g $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< ppm.cpp pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+
 clean:
-	rm -f pixels
+	rm -f pixels pixels_debug
