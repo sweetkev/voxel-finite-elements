@@ -79,21 +79,21 @@ struct ChildIndex
 };
 
 /** Returns Prolongation Matrix from a coarse mesh to a finer mesh */
-SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
-                                     const FiniteElementSpace &coarse_fes,
-                                     const PixelMesh &fine_mesh,
-                                     const FiniteElementSpace &fine_fes,
-                                     const Array<int> &fine_ess_dofs)
+SparseMatrix CreatePixelProlongation(const PixelMesh *coarse_mesh,
+                                     const FiniteElementSpace *coarse_fes,
+                                     const PixelMesh *fine_mesh,
+                                     const FiniteElementSpace *fine_fes,
+                                     const Array<int> *fine_ess_dofs)
 {
    // Initialize prolongation matrix
 
-   int nrows = fine_fes.GetTrueVSize(), ncols = coarse_fes.GetTrueVSize();
+   int nrows = fine_fes->GetTrueVSize(), ncols = coarse_fes->GetTrueVSize();
    SparseMatrix P(nrows,ncols);
 
    // Organize structure between coarse element "parents" and fine element "children"
 
-   const int coarse_ne = coarse_mesh.GetMesh().GetNE();
-   const int fine_ne = fine_mesh.GetMesh().GetNE();
+   const int coarse_ne = coarse_mesh->GetMesh().GetNE();
+   const int fine_ne = fine_mesh->GetMesh().GetNE();
 
    /* children and children_offsets utilize a CSR-like structure. For a 
       coarse element i, its children can be accessed by the indicies from
@@ -109,7 +109,7 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
    {
       children_offsets[i] = offset;
 
-      const Coord coarse_coord = coarse_mesh.GetElementCoord(i); 
+      const Coord coarse_coord = coarse_mesh->GetElementCoord(i); 
       Coord fine_coord(2*coarse_coord[0], 2*coarse_coord[1]);
 
       for (int jj = 0; jj < 2; ++jj)
@@ -118,7 +118,7 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
          for (int ii = 0; ii < 2; ++ii)
          {
             fine_coord[0] += ii;
-            const int fine_idx = fine_mesh.GetElementIndex(fine_coord);
+            const int fine_idx = fine_mesh->GetElementIndex(fine_coord);
             if (fine_idx >= 0)
             {
                children[offset] = {fine_idx, ii + 2*jj};
@@ -145,7 +145,7 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
       B,B, C,B, C,C, B,C // upper-right
    };
 
-   const FiniteElement &fe = *coarse_fes.GetFE(0);
+   const FiniteElement &fe = *coarse_fes->GetFE(0);
    const int n_loc_dof = fe.GetDof();
 
    IsoparametricTransformation isotr;
@@ -170,8 +170,8 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
          int child_element = child.fine_element;
 
          Array<int> rows, cols; 
-         fine_fes.GetElementDofs(child_element, rows);
-         coarse_fes.GetElementDofs(i, cols);
+         fine_fes->GetElementDofs(child_element, rows);
+         coarse_fes->GetElementDofs(i, cols);
 
          P.SetSubMatrix(rows,cols,local_P(child_position));         
       }
@@ -184,12 +184,12 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
 }
 
 /** Removes rows from prolongation P that correspond with boundary dofs */
-void EnforceProlongationBCs(SparseMatrix &P, const Array<int> &fine_ess_dofs)
+void EnforceProlongationBCs(SparseMatrix &P, const Array<int> *fine_ess_dofs)
 {
-   int nbdofs = fine_ess_dofs.Size();
+   int nbdofs = fine_ess_dofs->Size();
 
    for (int i=0; i < nbdofs; i++)
    {
-      P.EliminateRow(fine_ess_dofs[i]);
+      P.EliminateRow((*fine_ess_dofs)[i]);
    }
 }
