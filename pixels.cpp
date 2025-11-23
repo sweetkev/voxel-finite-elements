@@ -12,7 +12,7 @@ void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs);
 int main(int argc, char *argv[])
 {
    //parse options
-   std::string pgm_file = "pgm_files/small.pgm";
+   std::string pgm_file = "pgm_files/australia.pgm";
 
    mfem::OptionsParser args(argc, argv);
    args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
