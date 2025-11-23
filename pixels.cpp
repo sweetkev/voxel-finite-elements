@@ -106,8 +106,12 @@ int main(int argc, char *argv[])
       prolongations[level] = &P;
    }
 
+   
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
+
+   /*
+   The following code leads to a segmentation fault.
 
    CGSolver cg;
    cg.SetRelTol(1e-12);
@@ -115,9 +119,10 @@ int main(int argc, char *argv[])
    cg.SetPrintLevel(1);
    cg.SetOperator(fine_A);
    cg.SetPreconditioner(mg);
-   cg.Mult(B, X);
+   cg.Mult(B, X);                                  //this is where the exception occurs.
 
    fine_a.RecoverFEMSolution(X,b,x);
    x.Save("sol.gf");
    fine_mesh.GetMesh().Save("fine_mesh.mesh");
+   */
 }
