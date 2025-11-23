@@ -20,11 +20,11 @@ int main(int argc, char *argv[])
 
    //make mesh from file
    PixelMesh fine_mesh(pgm_file);
-   std::cout << "fine mesh generated\n";
 
    //coarsen mesh
    PixelMesh coarse_mesh = fine_mesh.CoarsenMesh();
-   std::cout << "mesh coarsened\n";
+
+   coarse_mesh.GetMesh().Save("coarse_mesh.mesh");
 
    const int order = 1;
 
@@ -84,14 +84,11 @@ int main(int argc, char *argv[])
    smoothers[0] = &coarse_solver;
    smoothers[1] = &fine_smoother;
 
-   SparseMatrix P = coarse_mesh.CreateProlongation(fine_mesh);
-   AddProlongationBCs(P,fine_ess_dofs);
-
+   SparseMatrix P = CreatePixelProlongation(coarse_mesh, coarse_fes, fine_mesh, fine_fes, fine_ess_dofs);
    prolongations[0] = &P;
 
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
-   std::cout << "multigrid constructed\n";
 
    CGSolver cg;
    cg.SetRelTol(1e-12);
@@ -104,13 +101,4 @@ int main(int argc, char *argv[])
    fine_a.RecoverFEMSolution(X,b,x);
    x.Save("sol.gf");
    fine_mesh.GetMesh().Save("fine_mesh.mesh");
-}
-
-/** Removes rows from prolongation P that correspond with boundary dofs */
-void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs) {
-   int nbdofs = fine_ess_dofs.Size();
-
-   for(int i=0; i < nbdofs; i++) {
-      P.EliminateRow(fine_ess_dofs[i]);
-   }
 }

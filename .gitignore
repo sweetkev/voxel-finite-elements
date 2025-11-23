@@ -55,3 +55,5 @@
 # MFEM meshes and solutions
 *.mesh
 *.gf
+
+Make.user

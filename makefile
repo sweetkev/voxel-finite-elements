@@ -1,4 +1,4 @@
-MFEM_DIR = ${HOME}/mfem/mfem
+-include Make.user
 
 ifndef MFEM_DIR
 $(error MFEM_DIR is not set)
@@ -15,4 +15,4 @@ pixels: pixels.cpp ppm.cpp pixel_mesh.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< ppm.cpp pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
 
 clean:
-	rm pixels
+	rm -f pixels
