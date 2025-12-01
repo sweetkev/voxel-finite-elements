@@ -14,15 +14,17 @@ int main(int argc, char *argv[])
 {
    //parse options
    string pgm_file = "pgm_files/australia.pgm";
+   int nlevels = -1;
+   int order = 1;
 
    OptionsParser args(argc, argv);
    args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
+   args.AddOption(&nlevels, "-nl", "--nlevels", "number of multigrid levels");
+   args.AddOption(&order, "-o", "--order", "polynomial order");
    args.ParseCheck();
 
    //make mesh from file
    PixelMesh *fine_mesh = new PixelMesh(pgm_file);
-
-   const int order = 1;
 
    H1_FECollection fec(order, fine_mesh->GetMesh().Dimension());
    FiniteElementSpace *fine_fes = new FiniteElementSpace(&fine_mesh->GetMesh(),
@@ -49,8 +51,20 @@ int main(int argc, char *argv[])
    Vector X, B;
    fine_a.FormLinearSystem(*fine_ess_dofs, x, b, fine_A, X, B);
 
+   // If nlevels was not specified, coarsen until height or width is 2
+   if(nlevels < 0) {
+      int width = fine_mesh->GetWidth();
+      int height = fine_mesh->GetHeight();
+      
+      // Fnd the number of coarsenings until height or width is 2 (if square, when we have a 2x2 grid)
+      // Given by max[ ceil(log_2(width)), ceil(log_2(height)) ]
+      int a = ceil(log(width) / log(2));
+      int b = ceil(log(height) / log(2));
+      nlevels = max(a,b);
+      cout << "new nlevels: " + to_string(nlevels);
+   }
+
    //create multigrid operators
-   const int nlevels = 2;
    Array<Operator*> operators(nlevels);
    Array<Solver*> smoothers(nlevels);
    Array<Operator*> prolongations(nlevels - 1);
@@ -76,7 +90,7 @@ int main(int argc, char *argv[])
    DSmoother fine_smoother(fine_A);
    smoothers[nlevels-1] = &fine_smoother;
 
-   for (int level = nlevels-2; level >=0; --level)
+   for (int level = nlevels-2; level >= 0; --level)
    {
       PixelMesh *coarse_mesh = new PixelMesh(meshes[level+1]->CoarsenMesh());
       meshes[level].reset(coarse_mesh);
@@ -117,7 +131,6 @@ int main(int argc, char *argv[])
       prolongations[level] = P;
       own_prolongations[level] = true;
    }
-
 
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
