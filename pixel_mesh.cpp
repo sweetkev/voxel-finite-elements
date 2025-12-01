@@ -39,6 +39,7 @@ PixelMesh::PixelMesh(const PixelImage &image_) : image(image_)
    }
 
    // Add the elements.
+   element_to_coord.resize(width*height);
    int e = 0;
    for (int j = 0; j < height; ++j)
    {

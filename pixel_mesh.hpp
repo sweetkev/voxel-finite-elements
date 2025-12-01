@@ -49,7 +49,7 @@ public:
    const int GetHeight() const { return height; }
 
    /** Returns the bottom-left coordinates of element i */
-   Coord GetElementCoord(int i) const { return element_to_coord.at(i); }
+   Coord GetElementCoord(int i) const { return element_to_coord[i]; }
 
    /** Returns the element index of the elmement with bottom-left coordinates coord */
    int GetElementIndex(Coord coord) const
@@ -70,8 +70,7 @@ private:
 
    Mesh mesh;
    std::unordered_map<Coord, int> coord_to_element;
-   std::unordered_map<int, Coord>
-   element_to_coord; // TODO: could be std::vetor<Coord>
+   std::vector<Coord> element_to_coord;
 
    int width = -1;
    int height = -1;
