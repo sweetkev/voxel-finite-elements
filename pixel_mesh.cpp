@@ -66,8 +66,8 @@ PixelMesh::PixelMesh(const PixelImage &image_) : image(image_)
    mesh.Swap(the_mesh, true);
 }
 
-/* Each child index corresponds to a fine element. The sub_element_position indicates 
-   the position of the fine element in realtion to its parental coarse element. 
+/* Each child index corresponds to a fine element. The sub_element_position indicates
+   the position of the fine element in realtion to its parental coarse element.
    sub_element_position is lexicographic left-to-right, bottom-to-top, i.e.
    2 3
    0 1
@@ -95,9 +95,9 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
    const int coarse_ne = coarse_mesh.GetMesh().GetNE();
    const int fine_ne = fine_mesh.GetMesh().GetNE();
 
-   /* children and children_offsets utilize a CSR-like structure. For a 
+   /* children and children_offsets utilize a CSR-like structure. For a
       coarse element i, its children can be accessed by the indicies from
-      children_offsets[i] up to (not including) children_offsets[i+1]. 
+      children_offsets[i] up to (not including) children_offsets[i+1].
    */
 
 
@@ -109,7 +109,7 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
    {
       children_offsets[i] = offset;
 
-      const Coord coarse_coord = coarse_mesh.GetElementCoord(i); 
+      const Coord coarse_coord = coarse_mesh.GetElementCoord(i);
       Coord fine_coord(2*coarse_coord[0], 2*coarse_coord[1]);
 
       for (int jj = 0; jj < 2; ++jj)
@@ -163,17 +163,19 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
       // fe.GetLocalRestriction(isotr, local_R(i));
    }
 
-   for(int i = 0; i < coarse_ne; ++i) {
-      for(int j = children_offsets[i]; j < children_offsets[i+1]; ++j) {
+   for (int i = 0; i < coarse_ne; ++i)
+   {
+      for (int j = children_offsets[i]; j < children_offsets[i+1]; ++j)
+      {
          ChildIndex child = children[j];
          int child_position = child.sub_element_position;
          int child_element = child.fine_element;
 
-         Array<int> rows, cols; 
+         Array<int> rows, cols;
          fine_fes.GetElementDofs(child_element, rows);
          coarse_fes.GetElementDofs(i, cols);
 
-         P.SetSubMatrix(rows,cols,local_P(child_position));         
+         P.SetSubMatrix(rows,cols,local_P(child_position));
       }
    }
 

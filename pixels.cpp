@@ -6,65 +6,65 @@
 #include <tuple>
 
 using namespace mfem;
+using namespace std;
 
 void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs);
 
 int main(int argc, char *argv[])
 {
    //parse options
-   std::string pgm_file = "pgm_files/australia.pgm";
+   string pgm_file = "pgm_files/australia.pgm";
+   int nlevels = -1;
+   int order = 1;
 
-   mfem::OptionsParser args(argc, argv);
+   OptionsParser args(argc, argv);
    args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
+   args.AddOption(&nlevels, "-nl", "--nlevels", "number of multigrid levels");
+   args.AddOption(&order, "-o", "--order", "polynomial order");
    args.ParseCheck();
 
    //make mesh from file
-   PixelMesh fine_mesh(pgm_file);
+   PixelMesh *fine_mesh = new PixelMesh(pgm_file);
 
-   //coarsen mesh
-   PixelMesh coarse_mesh = fine_mesh.CoarsenMesh();
+   H1_FECollection fec(order, fine_mesh->GetMesh().Dimension());
+   FiniteElementSpace *fine_fes = new FiniteElementSpace(&fine_mesh->GetMesh(),
+                                                         &fec);
 
-   coarse_mesh.GetMesh().Save("coarse_mesh.mesh");
+   Array<int> *fine_ess_dofs = new Array<int>;
+   fine_fes->GetBoundaryTrueDofs(*fine_ess_dofs);
 
-   const int order = 1;
-
-   //setup finite element spaces
-   H1_FECollection fec(order, fine_mesh.GetMesh().Dimension());
-   FiniteElementSpace fine_fes(&fine_mesh.GetMesh(), &fec);
-   FiniteElementSpace coarse_fes(&coarse_mesh.GetMesh(), &fec);
-
-   Array<int> fine_ess_dofs;
-   fine_fes.GetBoundaryTrueDofs(fine_ess_dofs);
-
-   BilinearForm fine_a(&fine_fes);
+   BilinearForm fine_a(fine_fes);
    fine_a.AddDomainIntegrator(new DiffusionIntegrator);
    fine_a.Assemble();
 
    //initial guess
-   GridFunction x(&fine_fes);
+   GridFunction x(fine_fes);
    x = 0.0;
 
    //right-hand side
    ConstantCoefficient one(1.0);
-   LinearForm b(&fine_fes);
+   LinearForm b(fine_fes);
    b.AddDomainIntegrator(new DomainLFIntegrator(one));
    b.Assemble();
 
    SparseMatrix fine_A;
    Vector X, B;
-   fine_a.FormLinearSystem(fine_ess_dofs, x, b, fine_A, X, B);
+   fine_a.FormLinearSystem(*fine_ess_dofs, x, b, fine_A, X, B);
 
-   Array<int> coarse_ess_dofs;
-   coarse_fes.GetBoundaryTrueDofs(coarse_ess_dofs);
-
-   BilinearForm coarse_a(&coarse_fes);
-   coarse_a.AddDomainIntegrator(new DiffusionIntegrator);
-   coarse_a.Assemble();
-   SparseMatrix coarse_A;
-   coarse_a.FormSystemMatrix(coarse_ess_dofs, coarse_A);
+   // If nlevels was not specified, coarsen until height or width is 2
+   if(nlevels < 0) {
+      int width = fine_mesh->GetWidth();
+      int height = fine_mesh->GetHeight();
+      
+      // Fnd the number of coarsenings until height or width is 2 (if square, when we have a 2x2 grid)
+      // Given by max[ ceil(log_2(width)), ceil(log_2(height)) ]
+      int a = ceil(log(width) / log(2));
+      int b = ceil(log(height) / log(2));
+      nlevels = max(a,b);
+      cout << "new nlevels: " + to_string(nlevels);
+   }
 
    //create multigrid operators
-   const int nlevels = 2;
    Array<Operator*> operators(nlevels);
    Array<Solver*> smoothers(nlevels);
    Array<Operator*> prolongations(nlevels - 1);
@@ -76,16 +76,61 @@ int main(int argc, char *argv[])
    own_smoothers = false;
    own_prolongations = false;
 
-   operators[0] = &coarse_A;
-   operators[1] = &fine_A;
+   vector<unique_ptr<PixelMesh>> meshes(nlevels);
+   vector<unique_ptr<FiniteElementSpace>> fe_spaces(nlevels);
+   vector<unique_ptr<BilinearForm>> forms(nlevels);
+   vector<unique_ptr<Array<int>>> ess_dofs(nlevels);
 
-   UMFPackSolver coarse_solver(coarse_A);
+   meshes[nlevels-1].reset(fine_mesh);
+   fe_spaces[nlevels-1].reset(fine_fes);
+   ess_dofs[nlevels-1].reset(fine_ess_dofs);
+
+   operators[nlevels-1] = &fine_A;
+
    DSmoother fine_smoother(fine_A);
-   smoothers[0] = &coarse_solver;
-   smoothers[1] = &fine_smoother;
+   smoothers[nlevels-1] = &fine_smoother;
 
-   SparseMatrix P = CreatePixelProlongation(coarse_mesh, coarse_fes, fine_mesh, fine_fes, fine_ess_dofs);
-   prolongations[0] = &P;
+   for (int level = nlevels-2; level >= 0; --level)
+   {
+      PixelMesh *coarse_mesh = new PixelMesh(meshes[level+1]->CoarsenMesh());
+      meshes[level].reset(coarse_mesh);
+
+      FiniteElementSpace *coarse_fes = new FiniteElementSpace(
+         &coarse_mesh->GetMesh(), &fec);
+      fe_spaces[level].reset(coarse_fes);
+
+      Array<int> *coarse_ess_dofs = new Array<int>;
+      coarse_fes->GetBoundaryTrueDofs(*coarse_ess_dofs);
+      ess_dofs[level].reset(coarse_ess_dofs);
+
+      BilinearForm *coarse_a = new BilinearForm(coarse_fes);
+      coarse_a->AddDomainIntegrator(new DiffusionIntegrator);
+      coarse_a->Assemble();
+
+      OperatorHandle coarse_A;
+      coarse_a->FormSystemMatrix(*coarse_ess_dofs, coarse_A);
+      coarse_A.SetOperatorOwner(false);
+
+      operators[level] = coarse_A.Ptr();
+      own_operators[level] = true;
+
+      if (level == 0)
+      {
+         smoothers[0] = new UMFPackSolver(*coarse_A.As<SparseMatrix>());
+      }
+      else
+      {
+         smoothers[level] = new DSmoother(*coarse_A.As<SparseMatrix>());
+      }
+      own_smoothers[level] = true;
+
+      SparseMatrix *P = new SparseMatrix(
+         CreatePixelProlongation(*meshes[level], *fe_spaces[level],
+                                 *meshes[level+1], *fe_spaces[level+1],
+                                 *ess_dofs[level+1]));
+      prolongations[level] = P;
+      own_prolongations[level] = true;
+   }
 
    Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
                 own_prolongations);
@@ -100,5 +145,5 @@ int main(int argc, char *argv[])
 
    fine_a.RecoverFEMSolution(X,b,x);
    x.Save("sol.gf");
-   fine_mesh.GetMesh().Save("fine_mesh.mesh");
+   fine_mesh->GetMesh().Save("fine_mesh.mesh");
 }

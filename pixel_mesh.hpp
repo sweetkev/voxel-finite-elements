@@ -42,6 +42,12 @@ public:
    /** Returns associated mesh as const */
    const Mesh &GetMesh() const { return mesh; }
 
+   /** Returns mesh width */
+   const int GetWidth() const { return width; }
+
+   /** Returns mesh height */
+   const int GetHeight() const { return height; }
+
    /** Returns the bottom-left coordinates of element i */
    Coord GetElementCoord(int i) const { return element_to_coord.at(i); }
 
@@ -78,4 +84,3 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
                                      const Array<int> &fine_ess_dofs);
 
 void EnforceProlongationBCs(SparseMatrix &P, const Array<int> &fine_ess_dofs);
-
