@@ -57,11 +57,8 @@ int main(int argc, char *argv[])
       int height = fine_mesh->GetHeight();
       
       // Fnd the number of coarsenings until height or width is 2 (if square, when we have a 2x2 grid)
-      // Given by max[ ceil(log_2(width)), ceil(log_2(height)) ]
-      int a = ceil(log(width) / log(2));
-      int b = ceil(log(height) / log(2));
-      nlevels = max(a,b);
-      cout << "new nlevels: " + to_string(nlevels);
+      nlevels = max(ceil(log2(width)),ceil(log2(height)));
+      cout << "new nlevels: " << to_string(nlevels) << "\n";
    }
 
    //create multigrid operators
