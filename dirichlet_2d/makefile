@@ -1,4 +1,4 @@
--include Make.user
+-include ../Make.user
 
 ifndef MFEM_DIR
 $(error MFEM_DIR is not set)

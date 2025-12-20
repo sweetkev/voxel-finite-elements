@@ -13,7 +13,7 @@ void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs);
 int main(int argc, char *argv[])
 {
    //parse options
-   string pgm_file = "pgm_files/australia.pgm";
+   string pgm_file = "../pgm_files/australia.pgm";
    int nlevels = -1;
    int order = 1;
 
