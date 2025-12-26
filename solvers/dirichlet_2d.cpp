@@ -8,8 +8,6 @@
 using namespace mfem;
 using namespace std;
 
-void AddProlongationBCs(SparseMatrix &P, Array<int> &fine_ess_dofs);
-
 int main(int argc, char *argv[])
 {
    //parse options
