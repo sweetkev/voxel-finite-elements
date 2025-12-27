@@ -15,8 +15,8 @@ CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
 
 .PHONY: clean
 
-dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing_2d/ppm.cpp $(SRC_DIR)/meshing_2d/pixel_mesh.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing_2d/ppm.cpp $(SRC_DIR)/meshing_2d/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing_2d
+dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp
+	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
 
 clean:
 	rm -f dirichlet_2d
