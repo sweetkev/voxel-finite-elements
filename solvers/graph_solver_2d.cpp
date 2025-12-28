@@ -1,6 +1,7 @@
 #include "mfem.hpp"
 #include "ppm.hpp"
 #include "pixel_mesh.hpp"
+#include "graph.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -46,7 +47,10 @@ int main(int argc, char *argv[])
     fine_a.FormLinearSystem(fine_ess_dofs, x, b, fine_A, X, B);
 
     //create multigrid operator
+    Graph fine_graph(fine_fes);
 
     //solve problem
+
+    fine_mesh.GetMesh().Save("mesh.mesh");
 
 }
