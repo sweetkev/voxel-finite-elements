@@ -13,7 +13,7 @@ Graph::Graph(const FiniteElementSpace &fes)
     for(int i = 0; i < ne; i++)
     {
         node_to_element.Append(i);
-        
+
         Array<int> idofs;
         element_to_dof.GetRow(i,idofs);
         
@@ -32,7 +32,13 @@ Graph::Graph(const FiniteElementSpace &fes)
         }
     }
     graph.Finalize();
-};
+}
+
+Array<int> Graph::GetElementNodes(int i) {
+    Array<int> element_nodes;
+    element_to_node.GetRow(i,element_nodes);
+    return element_nodes;
+}
 
 bool Graph::SharesDof(const Array<int> &idofs, const Array<int> &jdofs)
 {
