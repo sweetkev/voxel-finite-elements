@@ -15,6 +15,7 @@ class Graph
 
     private:
         SparseMatrix graph;
+        Array<int> node_to_element;
 
         /** Returns true if the two arrays of DoFs share any DoFs */
         bool SharesDof(const Array<int> &idofs, const Array<int> &jdofs);
