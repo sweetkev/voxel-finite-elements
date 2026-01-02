@@ -11,7 +11,11 @@ class Graph
          */
         Graph(const FiniteElementSpace &fes);
 
+        /** Returns the sparse matrix representing the graph */
         const SparseMatrix &GetGraph() { return graph; }
+
+        /** Returns the geometric mesh element represented by node i */
+        int GetNodeElement(int i) { return node_to_element[i]; }
 
     private:
         SparseMatrix graph;
