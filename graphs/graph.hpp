@@ -59,4 +59,10 @@ private:
 
     /** Returns true if the two arrays of DoFs share any DoFs */
     bool SharesDof(const Array<int> &idofs, const Array<int> &jdofs);
+
+    /** 
+     * Labels each node with the index of the node it 
+     *  corresponds to in the coarse graph 
+    */
+    void LabelGraph();
 };

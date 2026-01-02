@@ -80,3 +80,18 @@ bool Graph::SharesDof(const Array<int> &idofs, const Array<int> &jdofs)
 
     return false;
 }
+
+void Graph::LabelGraph()
+{
+    // In each 2x2 block of elements that becomes a coarse element, there are
+    // coarse nodes for each disjoint connected set of fine nodes. For a
+    // standard coarsening, this gives 1 coarse node for each 2x2 block of fine
+    // elements.
+
+    PixelImage coarse_image = image.Coarsen();
+    int new_width = coarse_image.Width(), new_height = coarse_image.Height();
+    
+    int label = 0;
+    // Look at pixel_mesh.cpp for parent-child relationship implementation
+    // that we will mimic here.
+}
