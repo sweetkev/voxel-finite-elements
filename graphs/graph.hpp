@@ -22,6 +22,9 @@ class Graph
 
     private:
         SparseMatrix graph;
+        Array<int> graph_labeling;
+
+        // Maps between nodes and geometric elements
         Array<int> node_to_element;
         Array2D<int> element_to_node;
 

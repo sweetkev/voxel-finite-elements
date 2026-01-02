@@ -10,16 +10,20 @@ Graph::Graph(const FiniteElementSpace &fes)
     graph = SparseMatrix(ne, ne);
     const Table &element_to_dof = fes.GetElementToDofTable();
 
+    element_to_node.SetSize(ne,1);
+
+    // Create graph
     for(int i = 0; i < ne; i++)
     {
         node_to_element.Append(i);
+        element_to_node(i,0) = i;
 
         Array<int> idofs;
         element_to_dof.GetRow(i,idofs);
         
         for(int j = 0; j < ne; j++)
         {
-            // An element should not be connected to itself.
+            // An element should not be connected to itself
             if (i == j) { continue; }
 
             Array<int> jdofs;
