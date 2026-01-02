@@ -1,3 +1,5 @@
+#pragma once
+
 #include "ppm.hpp"
 #include "mfem.hpp"
 #include <iostream>

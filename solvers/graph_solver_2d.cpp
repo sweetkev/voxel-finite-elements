@@ -21,36 +21,37 @@ int main(int argc, char *argv[])
     args.ParseCheck();
 
     //generate fine mesh from pgm file
-    PixelMesh fine_mesh(pgm_file);
+    PixelImage image(pgm_file);
+    PixelMesh mesh(image);
 
     //set up problem
-    H1_FECollection fec(order, fine_mesh.GetMesh().Dimension());
-    FiniteElementSpace fine_fes(&fine_mesh.GetMesh(), &fec);
+    H1_FECollection fec(order, mesh.GetMesh().Dimension());
+    FiniteElementSpace fes(&mesh.GetMesh(), &fec);
 
-    Array<int> fine_ess_dofs;
-    fine_fes.GetBoundaryTrueDofs(fine_ess_dofs);
+    Array<int> ess_dofs;
+    fes.GetBoundaryTrueDofs(ess_dofs);
 
-    BilinearForm fine_a(&fine_fes);
-    fine_a.AddDomainIntegrator(new DiffusionIntegrator);
-    fine_a.Assemble();
+    BilinearForm a(&fes);
+    a.AddDomainIntegrator(new DiffusionIntegrator);
+    a.Assemble();
 
-    GridFunction x(&fine_fes);
+    GridFunction x(&fes);
     x = 0.0;
 
     ConstantCoefficient one(1.0);
-    LinearForm b(&fine_fes);
+    LinearForm b(&fes);
     b.AddDomainIntegrator(new DomainLFIntegrator(one));
     b.Assemble();
 
-    SparseMatrix fine_A;
+    SparseMatrix A;
     Vector X, B;
-    fine_a.FormLinearSystem(fine_ess_dofs, x, b, fine_A, X, B);
+    a.FormLinearSystem(ess_dofs, x, b, A, X, B);
 
     //create multigrid operator
-    Graph fine_graph(fine_fes);
+    Graph fine_graph(fes, image);
 
     //solve problem
 
-    fine_mesh.GetMesh().Save("mesh.mesh");
+    mesh.GetMesh().Save("mesh.mesh");
 
 }

@@ -54,7 +54,7 @@ Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image)
             coord_to_element[coord] = e;
             element_to_coord[e] = coord;
             e++;
-         }
+        }
       }
    }    
 }
