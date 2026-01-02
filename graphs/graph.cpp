@@ -1,10 +1,13 @@
 #include "graph.hpp"
 #include "mfem.hpp"
+#include "ppm.hpp"
+#include "pixel_mesh.hpp"
+#include <unordered_map>
 
 
 using namespace mfem;
 
-Graph::Graph(const FiniteElementSpace &fes) 
+Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image) 
 {
     int ne = fes.GetNE();
     graph = SparseMatrix(ne, ne);
@@ -36,6 +39,24 @@ Graph::Graph(const FiniteElementSpace &fes)
         }
     }
     graph.Finalize();
+
+    // Create maps between coordinates and vertices
+    int width = image.Width(), height = image.Height();
+    element_to_coord.resize(width*height);
+    int e = 0;
+    for (int j = 0; j < height; ++j)
+    {
+        for (int i = 0; i < width; ++i)
+        {
+        if (image(i, j) != 0)
+        {
+            Coord coord(i, j);
+            coord_to_element[coord] = e;
+            element_to_coord[e] = coord;
+            e++;
+         }
+      }
+   }    
 }
 
 Array<int> Graph::GetElementNodes(int i) {
