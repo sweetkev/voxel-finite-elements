@@ -12,7 +12,7 @@ public:
      * Returns the graph where nodes represent elements, and edges exist
      *  between elements that share DoFs
      */
-    Graph(const FiniteElementSpace &fes, const PixelImage &image);
+    Graph(const FiniteElementSpace &fes, const PixelImage &image_);
 
     /** Returns the sparse matrix representing the graph */
     const SparseMatrix &GetGraph() { return graph; }
@@ -46,6 +46,8 @@ public:
 private:
     SparseMatrix graph;
     Array<int> graph_labeling;
+
+    PixelImage image;
 
     // Maps between nodes and geometric elements
     Array<int> node_to_element;

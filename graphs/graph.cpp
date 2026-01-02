@@ -7,7 +7,8 @@
 
 using namespace mfem;
 
-Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image) 
+Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_) 
+    : image(image_)
 {
     int ne = fes.GetNE();
     graph = SparseMatrix(ne, ne);
