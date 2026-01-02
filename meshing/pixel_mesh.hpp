@@ -51,7 +51,10 @@ public:
    /** Returns the bottom-left coordinates of element i */
    Coord GetElementCoord(int i) const { return element_to_coord[i]; }
 
-   /** Returns the element index of the elmement with bottom-left coordinates coord */
+   /** 
+    * Returns the element index of the element with bottom-left 
+    *  coordinates coord 
+    */
    int GetElementIndex(Coord coord) const
    {
       auto it = coord_to_element.find(coord);
