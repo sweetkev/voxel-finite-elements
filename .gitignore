@@ -31,7 +31,8 @@
 *.exe
 *.out
 *.app
-pixels
+dirichlet_2d
+graph_solver_2d
 
 ### VisualStudioCode ###
 .vscode/
