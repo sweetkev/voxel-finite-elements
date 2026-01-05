@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
 
     //create multigrid operator
     Graph fine_graph(fes, image);
+    Graph coarse_graph = fine_graph.CoarsenGraph();
 
     //solve problem
 

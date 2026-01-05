@@ -8,6 +8,19 @@ using namespace mfem;
 class Graph 
 {
 public:
+    Graph(SparseMatrix &graph_,
+        Array<int> &node_to_element_,
+        std::vector<std::vector<int>> &element_to_node_,
+        std::unordered_map<Coord, int> &coord_to_element_,
+        std::vector<Coord> &element_to_coord_,
+        const PixelImage &image_)
+        : graph(graph_),
+        node_to_element(node_to_element_),
+        element_to_node(element_to_node_),
+        coord_to_element(coord_to_element_),
+        element_to_coord(element_to_coord_),
+        image(image_) { }
+
     /** 
      * Returns the graph where nodes represent elements, and edges exist
      *  between elements that share DoFs
@@ -21,7 +34,8 @@ public:
     int GetNodeElement(int i) { return node_to_element[i]; }
 
     //** Returns the array of nodes that 'occupy' element i */
-    Array<int> GetElementNodes(int i);
+    std::vector<int> GetElementNodes(int i) 
+        { return element_to_node[i]; }
 
     /** Returns the bottom-left coordinates of element i */
     Coord GetElementCoord(int i) const { return element_to_coord[i]; }
@@ -43,15 +57,17 @@ public:
         }
     }
 
+    /** Returns a graph over a coarsened mesh */
+    Graph CoarsenGraph();
+
 private:
     SparseMatrix graph;
-    Array<int> graph_labeling;
 
     PixelImage image;
 
     // Maps between nodes and geometric elements
     Array<int> node_to_element;
-    Array2D<int> element_to_node;
+    std::vector<std::vector<int>> element_to_node;
 
     // Maps between coordiates and elements
     std::unordered_map<Coord, int> coord_to_element;
@@ -60,9 +76,20 @@ private:
     /** Returns true if the two arrays of DoFs share any DoFs */
     bool SharesDof(const Array<int> &idofs, const Array<int> &jdofs);
 
+    /** Creates maps between coordinates and elements */
+    void CreateCoordElementMaps(
+        std::unordered_map<Coord, int> &coord_to_vertex,
+        std::vector<Coord> &vertex_to_coord, const PixelImage &image_);
+
     /** 
      * Labels each node with the index of the node it 
-     *  corresponds to in the coarse graph 
+     *  corresponds to in the coarse graph. It also creates the 
+     *  element-to-node map for the coarse graph.
     */
-    void LabelGraph();
+    Array<int> LabelGraph(
+        Array<int> &coarse_node_to_element, 
+        std::vector<std::vector<int>> &coarse_element_to_node,
+        const std::unordered_map<Coord, int> &coarse_coord_to_element,
+        const std::vector<Coord> &coarse_element_to_coord, 
+        const PixelImage &coarse_image);
 };
