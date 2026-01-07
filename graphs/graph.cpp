@@ -11,7 +11,7 @@ Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_)
     : image(image_)
 {
     int ne = fes.GetNE();
-    graph = SparseMatrix(ne, ne);
+    graph = Table(ne, 8); // A fully surrounded element has at most 8 neighbors
     const Table &element_to_dof = fes.GetElementToDofTable();
 
     // Create graph
@@ -32,7 +32,7 @@ Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_)
             element_to_dof.GetRow(j,jdofs);
             
             if(SharesDof(idofs,jdofs)) {
-                graph.Add(i,j,1.0);
+                graph.AddConnection(i,j);
                 continue;
             }
         }
@@ -62,7 +62,7 @@ Graph Graph::CoarsenGraph()
         coarse_element_to_coord, coarse_image);
 
     // TODO: Create coarse graph from fine graph and its labeling
-    SparseMatrix coarse_graph;
+    Table coarse_graph;
 
     return Graph(coarse_graph,coarse_node_to_element, coarse_element_to_node,
         coarse_coord_to_element, coarse_element_to_coord, coarse_image);
@@ -132,7 +132,7 @@ Array<int> Graph::LabelGraph(
     // elements.
 
     Array<int> graph_labeling;
-    graph_labeling.SetSize(graph.Height(), -1);
+    graph_labeling.SetSize(graph.Size(), -1);
 
     int new_width = coarse_image.Width(), new_height = coarse_image.Height();
     int fine_ne = element_to_coord.size();

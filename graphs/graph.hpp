@@ -8,7 +8,7 @@ using namespace mfem;
 class Graph 
 {
 public:
-    Graph(SparseMatrix &graph_,
+    Graph(Table &graph_,
         Array<int> &node_to_element_,
         std::vector<std::vector<int>> &element_to_node_,
         std::unordered_map<Coord, int> &coord_to_element_,
@@ -27,8 +27,8 @@ public:
      */
     Graph(const FiniteElementSpace &fes, const PixelImage &image_);
 
-    /** Returns the sparse matrix representing the graph */
-    const SparseMatrix &GetGraph() { return graph; }
+    /** Returns the mfem table representing the graph */
+    const Table &GetGraph() { return graph; }
 
     /** Returns the geometric mesh element represented by node i */
     int GetNodeElement(int i) { return node_to_element[i]; }
@@ -61,7 +61,7 @@ public:
     Graph CoarsenGraph();
 
 private:
-    SparseMatrix graph;
+    Table graph;
 
     PixelImage image;
 
