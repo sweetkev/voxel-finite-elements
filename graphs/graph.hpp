@@ -92,4 +92,8 @@ private:
         const std::unordered_map<Coord, int> &coarse_coord_to_element,
         const std::vector<Coord> &coarse_element_to_coord, 
         const PixelImage &coarse_image);
+
+    /** Builds coarse graph according to graph labeling */
+    Table BuildCoarseGraph(Array<int> &graph_labeling,
+        int coarse_ne);
 };

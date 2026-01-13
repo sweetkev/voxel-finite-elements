@@ -32,7 +32,7 @@ Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_)
             element_to_dof.GetRow(j,jdofs);
             
             if(SharesDof(idofs,jdofs)) {
-                graph.AddConnection(i,j);
+                graph.Push(i,j);
                 continue;
             }
         }
@@ -61,8 +61,9 @@ Graph Graph::CoarsenGraph()
         coarse_element_to_node, coarse_coord_to_element,
         coarse_element_to_coord, coarse_image);
 
-    // TODO: Create coarse graph from fine graph and its labeling
-    Table coarse_graph;
+    // Create coarse graph from fine graph and its labeling
+    Table coarse_graph = BuildCoarseGraph(graph_labeling,
+        coarse_node_to_element.Size());
 
     return Graph(coarse_graph,coarse_node_to_element, coarse_element_to_node,
         coarse_coord_to_element, coarse_element_to_coord, coarse_image);
@@ -134,7 +135,7 @@ Array<int> Graph::LabelGraph(
     Array<int> graph_labeling;
     graph_labeling.SetSize(graph.Size(), -1);
 
-    int new_width = coarse_image.Width(), new_height = coarse_image.Height();
+    // int new_width = coarse_image.Width(), new_height = coarse_image.Height();
     int fine_ne = element_to_coord.size();
     int coarse_ne = coarse_element_to_coord.size();
     
@@ -210,8 +211,37 @@ Array<int> Graph::LabelGraph(
             label++;
         }
     }
+
+    std::cout << "Graph labeling: ";
+    for (const auto& element : graph_labeling) 
+    {
+        std::cout << element << " ";
+    }
+    std::cout << std::endl;
     
     return graph_labeling;
 }
 
+Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
+        int coarse_ne) 
+{
+    // Build connectivity matrix
+    Table P(graph.Size(), coarse_ne);
+    for(int i = 0; i < graph.Size(); ++i)
+    {
+        P.AddConnection(i, graph_labeling[i]);
+    }
+    P.Finalize();
 
+    // Build coarse graph
+    // G_coarse = P^T * G_fine * P
+    Table coarse_graph(coarse_ne, coarse_ne);
+    Table Pt;
+
+    Transpose(P, Pt, graph.Size());
+    Mult(Pt, graph, coarse_graph);
+    Mult(coarse_graph, P, coarse_graph);
+
+    coarse_graph.Finalize();
+    return coarse_graph;
+}
