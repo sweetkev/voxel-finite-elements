@@ -200,7 +200,7 @@ Array<int> Graph::LabelGraph(
             {
                 if(visited[k]) { continue; }
 
-                if(graph(coarse_element_nodes[j],coarse_element_nodes[k]) > 0)
+                if(graph(coarse_element_nodes[j],coarse_element_nodes[k]) >= 0)
                 {
                     graph_labeling[coarse_element_nodes[k]] = label;
                     visited[k] = true;
@@ -211,13 +211,6 @@ Array<int> Graph::LabelGraph(
             label++;
         }
     }
-
-    std::cout << "Graph labeling: ";
-    for (const auto& element : graph_labeling) 
-    {
-        std::cout << element << " ";
-    }
-    std::cout << std::endl;
     
     return graph_labeling;
 }
@@ -229,7 +222,7 @@ Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
     Table P(graph.Size(), coarse_ne);
     for(int i = 0; i < graph.Size(); ++i)
     {
-        P.AddConnection(i, graph_labeling[i]);
+        P.Push(i, graph_labeling[i]);
     }
     P.Finalize();
 
@@ -237,10 +230,15 @@ Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
     // G_coarse = P^T * G_fine * P
     Table coarse_graph(coarse_ne, coarse_ne);
     Table Pt;
+    Table temp;
 
-    Transpose(P, Pt, graph.Size());
-    Mult(Pt, graph, coarse_graph);
-    Mult(coarse_graph, P, coarse_graph);
+    Transpose(P, Pt, coarse_ne);
+    Pt.Finalize();
+    
+    Mult(Pt, graph, temp);
+    Mult(temp, P, coarse_graph);
+
+    // TODO: Remove self-connections in graph?
 
     coarse_graph.Finalize();
     return coarse_graph;
