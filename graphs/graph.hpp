@@ -73,9 +73,6 @@ private:
     std::unordered_map<Coord, int> coord_to_element;
     std::vector<Coord> element_to_coord;
 
-    /** Returns true if the two arrays of DoFs share any DoFs */
-    bool SharesDof(const Array<int> &idofs, const Array<int> &jdofs);
-
     /** Creates maps between coordinates and elements */
     void CreateCoordElementMaps(
         std::unordered_map<Coord, int> &coord_to_vertex,
@@ -96,7 +93,4 @@ private:
     /** Builds coarse graph according to graph labeling */
     Table BuildCoarseGraph(Array<int> &graph_labeling,
         int coarse_ne);
-    
-    /** Removes diagonal entries from graph */
-    void RemoveSelfConnections(Table &coarse_graph);
 };

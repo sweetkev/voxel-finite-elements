@@ -7,6 +7,64 @@
 
 using namespace mfem;
 
+// Helper functions without reference to class members
+namespace 
+{
+    /** Removes diagonal entries (representing self-connections) from graph */
+    void RemoveSelfConnections(Table &graph)
+    {
+        int size = graph.Size();
+        int *I = graph.GetI();
+        int *J = graph.GetJ();
+    
+        // Count non-self entries (necessary for the case of an isolated node)
+        int non_self_count = 0;
+        for(int i = 0; i < size; ++i)
+        {
+            for(int j = I[i]; j < I[i+1]; ++j)
+            {
+                if(J[j] != i) { non_self_count++; }
+            }
+        }
+
+        int *newI = new int[size + 1];
+        int *newJ = new int[non_self_count];
+    
+        int idx = 0;
+        for(int i = 0; i < size; ++i)
+        {
+            newI[i] = idx;
+            for(int j = I[i]; j < I[i+1]; ++j)
+            {
+                if(J[j] == i) { continue; }
+                newJ[idx] = J[j];
+                idx++;
+            }
+        }
+        newI[size] = idx;
+
+        graph.SetIJ(newI, newJ, size);
+    }
+
+    /** Returns true if the two arrays of DoFs share any DoFs */
+    bool SharesDof(const Array<int> &idofs, const Array<int> &jdofs)
+    {
+        for(int i = 0; i < idofs.Size(); i++)
+        {
+            for(int j = 0; j < jdofs.Size(); j++)
+            {
+                if(idofs[i] == jdofs[j]) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
+// Class member functions
+
 Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_) 
     : image(image_)
 {
@@ -67,21 +125,6 @@ Graph Graph::CoarsenGraph()
 
     return Graph(coarse_graph,coarse_node_to_element, coarse_element_to_node,
         coarse_coord_to_element, coarse_element_to_coord, coarse_image);
-}
-
-bool Graph::SharesDof(const Array<int> &idofs, const Array<int> &jdofs)
-{
-    for(int i = 0; i < idofs.Size(); i++)
-    {
-        for(int j = 0; j < jdofs.Size(); j++)
-        {
-            if(idofs[i] == jdofs[j]) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 void Graph::CreateCoordElementMaps(
@@ -243,39 +286,4 @@ Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
 
     coarse_graph.Finalize();
     return coarse_graph;
-}
-
-void Graph::RemoveSelfConnections(Table &coarse_graph)
-{
-    int size = coarse_graph.Size();
-    int *I = coarse_graph.GetI();
-    int *J = coarse_graph.GetJ();
-    
-    // Count non-self entries (necessary for the case of an isolated node)
-    int non_self_count = 0;
-    for(int i = 0; i < size; ++i)
-    {
-        for(int j = I[i]; j < I[i+1]; ++j)
-        {
-            if(J[j] != i) { non_self_count++; }
-        }
-    }
-
-    int *newI = new int[size + 1];
-    int *newJ = new int[non_self_count];
-    
-    int idx = 0;
-    for(int i = 0; i < size; ++i)
-    {
-        newI[i] = idx;
-        for(int j = I[i]; j < I[i+1]; ++j)
-        {
-            if(J[j] == i) { continue; }
-            newJ[idx] = J[j];
-            idx++;
-        }
-    }
-    newI[size] = idx;
-
-    coarse_graph.SetIJ(newI, newJ, size);
 }
