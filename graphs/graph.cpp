@@ -238,7 +238,38 @@ Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
     Mult(Pt, graph, temp);
     Mult(temp, P, coarse_graph);
 
-    // TODO: Remove self-connections in graph?
+    // Remove self-connections in graph
+    int size = coarse_graph.Size();
+    int *I = coarse_graph.GetI();
+    int *J = coarse_graph.GetJ();
+    
+    // Count non-self entries (necessary for the case of an isolated node)
+    int non_self_count = 0;
+    for(int i = 0; i < size; ++i)
+    {
+        for(int j = I[i]; j < I[i+1]; ++j)
+        {
+            if(J[j] != i) { non_self_count++; }
+        }
+    }
+
+    int *newI = new int[size + 1];
+    int *newJ = new int[non_self_count];
+    
+    int idx = 0;
+    for(int i = 0; i < size; ++i)
+    {
+        newI[i] = idx;
+        for(int j = I[i]; j < I[i+1]; ++j)
+        {
+            if(J[j] == i) { continue; }
+            newJ[idx] = J[j];
+            idx++;
+        }
+    }
+    newI[size] = idx;
+
+    coarse_graph.SetIJ(newI, newJ, size);
 
     coarse_graph.Finalize();
     return coarse_graph;
