@@ -239,6 +239,14 @@ Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
     Mult(temp, P, coarse_graph);
 
     // Remove self-connections in graph
+    RemoveSelfConnections(coarse_graph);
+
+    coarse_graph.Finalize();
+    return coarse_graph;
+}
+
+void Graph::RemoveSelfConnections(Table &coarse_graph)
+{
     int size = coarse_graph.Size();
     int *I = coarse_graph.GetI();
     int *J = coarse_graph.GetJ();
@@ -270,7 +278,4 @@ Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
     newI[size] = idx;
 
     coarse_graph.SetIJ(newI, newJ, size);
-
-    coarse_graph.Finalize();
-    return coarse_graph;
 }

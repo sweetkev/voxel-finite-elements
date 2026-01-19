@@ -96,4 +96,7 @@ private:
     /** Builds coarse graph according to graph labeling */
     Table BuildCoarseGraph(Array<int> &graph_labeling,
         int coarse_ne);
+    
+    /** Removes diagonal entries from graph */
+    void RemoveSelfConnections(Table &coarse_graph);
 };
