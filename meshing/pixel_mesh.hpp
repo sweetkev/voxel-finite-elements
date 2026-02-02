@@ -37,12 +37,14 @@ public:
    /** Returns coarsened mesh obtained from current mesh */
    PixelMesh CoarsenMesh() { return PixelMesh(image.Coarsen()); }
 
-
    /** Returns associated mesh */
    Mesh &GetMesh() { return mesh; }
 
    /** Returns associated mesh as const */
    const Mesh &GetMesh() const { return mesh; }
+
+   /** Returns dimension of mesh */
+   int Dimension() const { return mesh.Dimension(); }
 
    /** Returns mesh width */
    const int GetWidth() const { return width; }
