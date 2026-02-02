@@ -30,6 +30,14 @@ public:
     /** Returns the mfem table representing the graph */
     const Table &GetGraph() { return graph; }
 
+    /** Returns the indices of nodes that are connected to node i */
+    Array<int> GetConnectedNodes(int i) const
+    {
+        Array<int> connected_nodes;
+        graph.GetRow(i, connected_nodes);
+        return connected_nodes;
+    }
+
     /** Returns the geometric mesh cell represented by node i */
     int GetNodeCell(int i) { return node_to_cell[i]; }
 
