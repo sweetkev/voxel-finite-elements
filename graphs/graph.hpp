@@ -38,6 +38,9 @@ public:
         return connected_nodes;
     }
 
+    /** Returns the number of nodes in the graph */
+    int Size() const { return graph.Size(); }
+
     /** Returns the geometric mesh cell represented by node i */
     int GetNodeCell(int i) { return node_to_cell[i]; }
 
