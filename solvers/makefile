@@ -18,7 +18,7 @@ all: dirichlet_2d graph_solver_2d
 dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
 
-graph_solver_2d: graph_solver_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp
+graph_solver: graph_solver.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
 
 .PHONY: clean
