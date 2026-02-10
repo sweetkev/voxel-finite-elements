@@ -38,6 +38,11 @@ public:
         return connected_nodes;
     }
 
+    /** Returns index of the connection between node i and node j. 
+     * If there is no connection between node i and node j established in the 
+     * table, then the return value is -1. */
+    int operator() (int i, int j) const { return graph(i,j); }
+
     /** Returns the number of nodes in the graph */
     int Size() const { return graph.Size(); }
 
