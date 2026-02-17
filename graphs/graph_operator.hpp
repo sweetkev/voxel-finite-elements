@@ -16,17 +16,25 @@ public:
 private:
     Array<int> A_ref;
     FiniteElementSpace reference_fes;
-    Table dof_to_reference_element_map;
+
+    // Matrix whose (i,j) entry denotes the local dof number on reference
+    // element j which is identified with the local dof i on 
+    // the central reference element.
+    DenseMatrix local_to_neighbor_dof_map;
+    
     SparseMatrix Q;
     Graph graph;
 
     /** Creates the table whose ith row represents a local dof number
      *  and jth column represents a reference cell in the reference mesh
      */
-    void CreateDofToElementMap();
+    void CreateDofMap();
 
-    /** Returns array of elements who share given dof */
-    Array<int> NeighborsWithDof(int e, int dof);
+    /** Returns the local dof number on neighbor element that corresponds 
+     *  to the local dof number e_dof on element e. If the dof is not shared
+     *  between elements, returns -1
+    */
+    int GetNeighborDof(int e, int e_dof, int neighbor);
 };
 
 void CreateReferenceMesh(Mesh &reference_mesh,int dim);

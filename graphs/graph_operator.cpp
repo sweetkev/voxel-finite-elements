@@ -7,7 +7,7 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     : reference_fes(reference_fes_), graph(graph_)
 {
     // Create map from local dof # to neighboring cells with dof
-    CreateDofToElementMap();
+    CreateDofMap();
 
     // Create global dof labeling
     Array<int> ref_dofs;
@@ -37,20 +37,67 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
 
     for (int e = 0; e < ne; ++e)
     {
-        for (int i = 0; i < dofs_per_elem; ++i)
+        for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
         {
-            Array<int> neighbors_with_dof = NeighborsWithDof(e,i);
+            // Skip if interior dof
+            bool interior_dof = true;
+            for (int j = 0; j < 9; ++j) 
+            {
+                if (local_to_neighbor_dof_map(e_dof,j) != -1) 
+                { 
+                    interior_dof = false; 
+                }
+            }
+            if (interior_dof) { continue; }
+
+            // For each connected element, check if the dof is shared between
+            // them.
+            Array<int> connected_elements = graph.GetConnectedNodes(e);
+            for (int j = 0; j < connected_elements.Size(); ++j)
+            {
+                int neighbor = connected_elements[j];
+                int neighbor_dof = GetNeighborDof(e, e_dof, neighbor);
+                if (neighbor_dof != -1)
+                {
+                    int e_index = dofs_per_elem * e + e_dof;
+                    int neighbor_index = dofs_per_elem * neighbor + neighbor_dof;
+                    int ci = element_component_index[e_index];
+                    int cj = element_component_index[neighbor_index];
+                    if (ci != cj)
+                    {
+                        merge(e_index, neighbor_index);
+                    }
+                }
+            }
+        }
+    }
+
+    std::vector<std::set<int>> dof_groups;
+    for (int i = 0; i < nd; ++i)
+    {
+        if (!connected_components[i].empty())
+        {
+            dof_groups.push_back(connected_components[i]);
         }
     }
 }
 
-void GraphOperator::CreateDofToElementMap()
+void GraphOperator::CreateDofMap()
 {
     Array<int> ref_dofs;
     reference_fes.GetElementDofs(4, ref_dofs);
     const int dofs_per_elem = ref_dofs.Size();
 
-    Table dof_to_element_map;
+    local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
+    
+    // Initialize local dof - to - neighbor dof matrix with -1
+    for (int i = 0; i < local_to_neighbor_dof_map.Width(); ++i)
+    {
+        for (int j = 0; j < local_to_neighbor_dof_map.Height(); ++j)
+        {
+            local_to_neighbor_dof_map(i,j) = -1;
+        }
+    }
 
     // For each DoF of reference element, find the neighboring elements who
     // share the Dof
@@ -66,19 +113,75 @@ void GraphOperator::CreateDofToElementMap()
             {
                 if (neighbor_dofs[j] == dof)
                 {
-                    dof_to_element_map.Push(i, e);
+                    local_to_neighbor_dof_map(i,e) = j;
                     break;
                 }
             }
         }
     }
-
-    dof_to_reference_element_map = dof_to_element_map;
 }
 
-Array<int> GraphOperator::NeighborsWithDof(int e, int dof)
+int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
 {
-    Array<int> neighbors_with_dof;
+    int e_cell = graph.GetNodeCell(e);
+    int neighbor_cell = graph.GetNodeCell(neighbor);
+    Coord e_coord = graph.GetCellCoord(e_cell);
+    Coord neighbor_coord = graph.GetCellCoord(neighbor_cell);
+
+    switch (neighbor_coord[1] - e_coord[1])
+    {
+        // Bottom elements
+        case -1:
+            switch (neighbor_coord[0] - neighbor_coord[0])
+            {
+                // Bottom-left element
+                case -1:
+                    return local_to_neighbor_dof_map(e_dof, 0);
+                // Bottom-middle element
+                case 0:
+                    return local_to_neighbor_dof_map(e_dof, 1);
+                // Bottom-right element
+                case 1:
+                    return local_to_neighbor_dof_map(e_dof, 2);
+                default:
+                    break;
+            }
+        // Middle elements
+        case 0:
+            switch (neighbor_coord[1] - neighbor_coord[1])
+            {
+                // Middle-left element
+                case -1:
+                    return local_to_neighbor_dof_map(e_dof, 3);
+                // Middle-middle element
+                case 0:
+                    return local_to_neighbor_dof_map(e_dof, 4);
+                // Middle-right element
+                case 1:
+                    return local_to_neighbor_dof_map(e_dof, 5);
+                default:
+                    break;
+            }
+        // Top elements
+        case 1:
+            switch (neighbor_coord[1] - neighbor_coord[1])
+            {
+                // Top-left element
+                case -1:
+                    return local_to_neighbor_dof_map(e_dof, 6);
+                // Top-middle element
+                case 0:
+                    return local_to_neighbor_dof_map(e_dof, 7);
+                // Top-right element
+                case 1:
+                    return local_to_neighbor_dof_map(e_dof, 8);
+                default:
+                    break;
+            }
+    
+        default:
+            return -1;
+    }
 }
 
 void CreateReferenceMesh(Mesh &reference_mesh, int dim) 
