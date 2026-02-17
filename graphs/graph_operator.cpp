@@ -196,7 +196,7 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
 
 void GraphOperator::BuildQ(std::vector<std::set<int>> dof_groups)
 {
-    
+
 }
 
 void CreateReferenceMesh(Mesh &reference_mesh, int dim) 
@@ -236,5 +236,5 @@ void CreateReferenceMesh(Mesh &reference_mesh, int dim)
 
     mesh.Finalize();
     
-    Swap(mesh, reference_mesh);
+    reference_mesh.Swap(mesh, true);
 }
