@@ -1,3 +1,5 @@
+#pragma once
+
 #include "mfem.hpp"
 #include "ppm.hpp"
 #include "pixel_mesh.hpp"
