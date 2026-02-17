@@ -9,7 +9,54 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     // Create map from local dof # to neighboring cells with dof
     CreateDofMap();
 
-    // Create global dof labeling
+    // Create dof_groups
+    std::vector<std::set<int>> dof_groups = CreateDofGroups();
+
+    // Build Q matrix
+    BuildQ(dof_groups);
+}
+
+void GraphOperator::CreateDofMap()
+{
+    Array<int> ref_dofs;
+    reference_fes.GetElementDofs(4, ref_dofs);
+    const int dofs_per_elem = ref_dofs.Size();
+
+    local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
+    
+    // Initialize local dof - to - neighbor dof matrix with -1
+    for (int i = 0; i < local_to_neighbor_dof_map.Width(); ++i)
+    {
+        for (int j = 0; j < local_to_neighbor_dof_map.Height(); ++j)
+        {
+            local_to_neighbor_dof_map(i,j) = -1;
+        }
+    }
+
+    // For each DoF of reference element, find the neighboring elements who
+    // share the Dof
+    for (int i = 0; i < dofs_per_elem; ++i)
+    {
+        int dof = ref_dofs[i];
+        for (int e = 0; e < 9; ++e)
+        {
+            if (e == 4) { continue; }
+            Array<int> neighbor_dofs;
+            reference_fes.GetElementDofs(e,neighbor_dofs);
+            for (int j = 0; j < neighbor_dofs.Size(); ++j)
+            {
+                if (neighbor_dofs[j] == dof)
+                {
+                    local_to_neighbor_dof_map(i,e) = j;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+std::vector<std::set<int>> GraphOperator::CreateDofGroups()
+{
     Array<int> ref_dofs;
     reference_fes.GetElementDofs(0, ref_dofs);
     const int dofs_per_elem = ref_dofs.Size();
@@ -80,45 +127,8 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
             dof_groups.push_back(connected_components[i]);
         }
     }
-}
 
-void GraphOperator::CreateDofMap()
-{
-    Array<int> ref_dofs;
-    reference_fes.GetElementDofs(4, ref_dofs);
-    const int dofs_per_elem = ref_dofs.Size();
-
-    local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
-    
-    // Initialize local dof - to - neighbor dof matrix with -1
-    for (int i = 0; i < local_to_neighbor_dof_map.Width(); ++i)
-    {
-        for (int j = 0; j < local_to_neighbor_dof_map.Height(); ++j)
-        {
-            local_to_neighbor_dof_map(i,j) = -1;
-        }
-    }
-
-    // For each DoF of reference element, find the neighboring elements who
-    // share the Dof
-    for (int i = 0; i < dofs_per_elem; ++i)
-    {
-        int dof = ref_dofs[i];
-        for (int e = 0; e < 9; ++e)
-        {
-            if (e == 4) { continue; }
-            Array<int> neighbor_dofs;
-            reference_fes.GetElementDofs(e,neighbor_dofs);
-            for (int j = 0; j < neighbor_dofs.Size(); ++j)
-            {
-                if (neighbor_dofs[j] == dof)
-                {
-                    local_to_neighbor_dof_map(i,e) = j;
-                    break;
-                }
-            }
-        }
-    }
+    return dof_groups;
 }
 
 int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
@@ -182,6 +192,11 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
         default:
             return -1;
     }
+}
+
+void GraphOperator::BuildQ(std::vector<std::set<int>> dof_groups)
+{
+    
 }
 
 void CreateReferenceMesh(Mesh &reference_mesh, int dim) 

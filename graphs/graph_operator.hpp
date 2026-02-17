@@ -30,11 +30,23 @@ private:
      */
     void CreateDofMap();
 
+    /** Creates the vector with size equal to number of true dofs whose entries
+     *  contain the sets of broken dofs identified with the true dof.
+    */
+    std::vector<std::set<int>> CreateDofGroups();
+
     /** Returns the local dof number on neighbor element that corresponds 
      *  to the local dof number e_dof on element e. If the dof is not shared
      *  between elements, returns -1
     */
     int GetNeighborDof(int e, int e_dof, int neighbor);
+
+    /** Builds matrix Q such that A = Q^T ~A Q */
+    void BuildQ(std::vector<std::set<int>> dof_groups);
 };
 
+/** Builds mesh which contains all neighbor information for a single element.
+ *  For example in a 2D mesh, this is the 3x3 square. For a 3D mesh, it is
+ *  The 3x3 cube.
+ */
 void CreateReferenceMesh(Mesh &reference_mesh,int dim);
