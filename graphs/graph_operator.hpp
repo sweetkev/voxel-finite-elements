@@ -18,10 +18,10 @@ private:
     FiniteElementSpace reference_fes;
 
     // Matrix whose (i,j) entry denotes the local dof number on reference
-    // element j which is identified with the local dof i on 
+    // element j which is identified with the local dof i on
     // the central reference element.
     DenseMatrix local_to_neighbor_dof_map;
-    
+
     SparseMatrix Q;
     Graph graph;
 
@@ -35,7 +35,7 @@ private:
     */
     std::vector<std::set<int>> CreateDofGroups();
 
-    /** Returns the local dof number on neighbor element that corresponds 
+    /** Returns the local dof number on neighbor element that corresponds
      *  to the local dof number e_dof on element e. If the dof is not shared
      *  between elements, returns -1
     */
@@ -49,4 +49,4 @@ private:
  *  For example in a 2D mesh, this is the 3x3 square. For a 3D mesh, it is
  *  The 3x3 cube.
  */
-void CreateReferenceMesh(Mesh &reference_mesh,int dim);
+Mesh CreateReferenceMesh(int dim);

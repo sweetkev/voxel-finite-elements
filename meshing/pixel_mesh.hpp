@@ -16,8 +16,10 @@ struct Coord
    Coord(int i, int j) : coords({i, j}) { }
    int &operator[](int i) { return coords[i]; }
    int operator[](int i) const { return coords[i]; }
-   bool operator==(const Coord &other) const 
+   bool operator==(const Coord &other) const
       { return coords[0] == other[0] && coords[1] == other[1]; }
+   bool operator!=(const Coord &other) const
+      { return coords[0] != other[0] || coords[1] != other[1]; }
 };
 
 template<> struct std::hash<Coord>
@@ -56,9 +58,9 @@ public:
    /** Returns the bottom-left coordinates of element i */
    Coord GetElementCoord(int i) const { return element_to_coord[i]; }
 
-   /** 
-    * Returns the element index of the element with bottom-left 
-    *  coordinates coord 
+   /**
+    * Returns the element index of the element with bottom-left
+    *  coordinates coord
     */
    int GetElementIndex(Coord coord) const
    {

@@ -23,7 +23,7 @@ void GraphOperator::CreateDofMap()
     const int dofs_per_elem = ref_dofs.Size();
 
     local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
-    
+
     // Initialize local dof - to - neighbor dof matrix with -1
     for (int i = 0; i < local_to_neighbor_dof_map.Width(); ++i)
     {
@@ -88,11 +88,11 @@ std::vector<std::set<int>> GraphOperator::CreateDofGroups()
         {
             // Skip if interior dof
             bool interior_dof = true;
-            for (int j = 0; j < 9; ++j) 
+            for (int j = 0; j < 9; ++j)
             {
-                if (local_to_neighbor_dof_map(e_dof,j) != -1) 
-                { 
-                    interior_dof = false; 
+                if (local_to_neighbor_dof_map(e_dof,j) != -1)
+                {
+                    interior_dof = false;
                 }
             }
             if (interior_dof) { continue; }
@@ -188,7 +188,7 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
                 default:
                     break;
             }
-    
+
         default:
             return -1;
     }
@@ -199,42 +199,18 @@ void GraphOperator::BuildQ(std::vector<std::set<int>> dof_groups)
 
 }
 
-void CreateReferenceMesh(Mesh &reference_mesh, int dim) 
+Mesh CreateReferenceMesh(int dim)
 {
-    /** Creates 3x3 or 3x3x3 reference mesh */
-    //TODO: implement 3-dimensions
-    //MFEM_ASSERT(dim == 2 || dim == 3, "Dimension must be 2 or 3");
-        
-    MFEM_ASSERT(dim == 2, "dimension must be 2");
-
-    Mesh mesh;
-    /** 3x3 reference mesh with elements and vertices numbered as follows:
-     * elements:    vertices:
-     *              12 13 14 15
-     *  6 7 8       8  9  10 11
-     *  3 4 5       4  5  6  7
-     *  0 1 2       0  1  2  3
-     */
-    if(dim == 2)
+    if (dim == 2)
     {
-        for(int i = 0; i < 4; i++) 
-        {
-            for(int j = 0; j < 4; j++) 
-            {
-                mesh.AddVertex(i,j);
-            }
-        }
-
-        for(int i = 0; i < 3; i++)
-        {
-            for(int j = 0; j < 3; j++) 
-            {
-                mesh.AddQuad(i+j*4, i+1+j*4, i+1+(j+1)*4, i+(j+1)*4);
-            }
-        }
+        return Mesh::MakeCartesian2D(3, 3, Element::QUADRILATERAL, false, 1.0, 1.0, false);
     }
-
-    mesh.Finalize();
-    
-    reference_mesh.Swap(mesh, true);
+    else if (dim == 3)
+    {
+        return Mesh::MakeCartesian3D(3, 3, 3, Element::HEXAHEDRON, 1.0, 1.0, 1.0, false);
+    }
+    else
+    {
+        MFEM_ABORT("Unsupported dimension.");
+    }
 }

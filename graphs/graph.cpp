@@ -4,286 +4,248 @@
 #include "pixel_mesh.hpp"
 #include <unordered_map>
 
-
 using namespace mfem;
+using namespace std;
 
 // Helper functions without reference to class members
-namespace 
+namespace
 {
-    /** Removes diagonal entries (representing self-connections) from graph */
-    void RemoveSelfConnections(Table &graph)
-    {
-        int size = graph.Size();
-        int *I = graph.GetI();
-        int *J = graph.GetJ();
-    
-        // Count non-self entries (necessary for the case of an isolated node)
-        int non_self_count = 0;
-        for(int i = 0; i < size; ++i)
-        {
-            for(int j = I[i]; j < I[i+1]; ++j)
-            {
-                if(J[j] != i) { non_self_count++; }
-            }
-        }
+/** Removes diagonal entries (representing self-connections) from graph */
+void RemoveSelfConnections(Table &graph)
+{
+   int size = graph.Size();
+   int *I = graph.GetI();
+   int *J = graph.GetJ();
 
-        int *newI = new int[size + 1];
-        int *newJ = new int[non_self_count];
-    
-        int idx = 0;
-        for(int i = 0; i < size; ++i)
-        {
-            newI[i] = idx;
-            for(int j = I[i]; j < I[i+1]; ++j)
-            {
-                if(J[j] == i) { continue; }
-                newJ[idx] = J[j];
-                idx++;
-            }
-        }
-        newI[size] = idx;
+   // Count non-self entries (necessary for the case of an isolated node)
+   int non_self_count = 0;
+   for (int i = 0; i < size; ++i)
+   {
+      for (int j = I[i]; j < I[i+1]; ++j)
+      {
+         if (J[j] != i) { non_self_count++; }
+      }
+   }
 
-        graph.SetIJ(newI, newJ, size);
-    }
+   int *newI = new int[size + 1];
+   int *newJ = new int[non_self_count];
 
-    /** Returns true if the two arrays of DoFs share any DoFs */
-    bool SharesDof(const Array<int> &idofs, const Array<int> &jdofs)
-    {
-        for(int i = 0; i < idofs.Size(); i++)
-        {
-            for(int j = 0; j < jdofs.Size(); j++)
-            {
-                if(idofs[i] == jdofs[j]) {
-                    return true;
-                }
-            }
-        }
+   int idx = 0;
+   for (int i = 0; i < size; ++i)
+   {
+      newI[i] = idx;
+      for (int j = I[i]; j < I[i+1]; ++j)
+      {
+         if (J[j] == i) { continue; }
+         newJ[idx] = J[j];
+         idx++;
+      }
+   }
+   newI[size] = idx;
 
-        return false;
-    }
+   graph.SetIJ(newI, newJ, size);
+}
 }
 
 // Class member functions
 
-Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_) 
-    : image(image_)
+Graph::Graph(Table &graph_,
+             unordered_map<Coord, vector<int>> &coord_to_node_,
+             vector<Coord> &node_to_coord_)
+   : graph(graph_),
+     coord_to_node(coord_to_node_),
+     node_to_coord(node_to_coord_) { }
+
+Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_)
 {
-    int ne = fes.GetNE();
-    graph = Table(ne, 8); // A fully surrounded element has at most 8 neighbors
-    const Table &element_to_dof = fes.GetElementToDofTable();
+   // Element-to-element table is (element-to-dof) * (dof-to-element)
+   const Table &element_to_dof = fes.GetElementToDofTable();
+   unique_ptr<Table> dof_to_element(Transpose(element_to_dof));
+   Mult(element_to_dof, *dof_to_element, graph);
 
-    // Create graph
-    for(int i = 0; i < ne; i++)
-    {
-        node_to_cell.Append(i);
-        cell_to_node.push_back({i});
-
-        Array<int> idofs;
-        element_to_dof.GetRow(i,idofs);
-        
-        for(int j = 0; j < ne; j++)
-        {
-            // An cell should not be connected to itself
-            if (i == j) { continue; }
-
-            Array<int> jdofs;
-            element_to_dof.GetRow(j,jdofs);
-            
-            if(SharesDof(idofs,jdofs)) {
-                graph.Push(i,j);
-                continue;
-            }
-        }
-    }
-    graph.Finalize();
-
-    CreateCoordCellMaps(coord_to_cell, cell_to_coord, image);   
-}
-
-Graph Graph::CoarsenGraph() 
-{
-    // Generate coarsened geometry
-    PixelImage coarse_image = image.Coarsen();
-
-    // Create cell-coordinate maps over coarse graph
-    std::unordered_map<Coord, int> coarse_coord_to_cell;
-    std::vector<Coord> coarse_cell_to_coord;
-    CreateCoordCellMaps(coarse_coord_to_cell, coarse_cell_to_coord,
-        coarse_image);
-
-    // Create graph labeling and create node-cell maps over coarse graph
-    Array<int> coarse_node_to_cell;
-    std::vector<std::vector<int>> 
-        coarse_cell_to_node(coarse_cell_to_coord.size());
-    Array<int> graph_labeling = LabelGraph(coarse_node_to_cell, 
-        coarse_cell_to_node, coarse_coord_to_cell,
-        coarse_cell_to_coord, coarse_image);
-
-    // Create coarse graph from fine graph and its labeling
-    Table coarse_graph = BuildCoarseGraph(graph_labeling,
-        coarse_node_to_cell.Size());
-
-    return Graph(coarse_graph,coarse_node_to_cell, coarse_cell_to_node,
-        coarse_coord_to_cell, coarse_cell_to_coord, coarse_image);
-}
-
-void Graph::CreateCoordCellMaps(
-    std::unordered_map<Coord, int> &coord_to_cell_,
-    std::vector<Coord> &cell_to_coord_, const PixelImage &image_)
-{
-    // Create maps between coordinates and vertices
-    int width = image_.Width(), height = image_.Height();
-    cell_to_coord_.resize(width*height);
-    int e = 0;
-    for (int j = 0; j < height; ++j)
-    {
-        for (int i = 0; i < width; ++i)
-        {
-        if (image_(i, j) != 0)
-        {
+   // Create maps between coordinates and vertices
+   const int width = image_.Width();
+   const int height = image_.Height();
+   int e = 0;
+   for (int j = 0; j < height; ++j)
+   {
+      for (int i = 0; i < width; ++i)
+      {
+         if (image_(i, j) != 0)
+         {
             Coord coord(i, j);
-            coord_to_cell_[coord] = e;
-            cell_to_coord_[e] = coord;
-            e++;
-        }
+            coord_to_node[coord].push_back(e);
+            node_to_coord.push_back(coord);
+            grid_cells.push_back(coord);
+            ++e;
+         }
       }
    }
-   cell_to_coord_.resize(e);   
 }
 
-/* Each child index corresponds to a fine cell. The sub_cell_position indicates
-   the position of the fine cell in realtion to its parental coarse cell.
-   sub_cell_position is lexicographic left-to-right, bottom-to-top, i.e.
-   2 3
-   0 1
-*/
-struct ChildIndex
+Graph Graph::CoarsenGraph()
 {
-    int fine_cell;
-    int sub_cell_position;
-};
+   // Create graph labeling and create node-cell maps over coarse graph
+   vector<Coord> coarse_node_to_coord;
+   unordered_map<Coord, vector<int>> coarse_coord_to_node;
+
+   Array<int> graph_labeling = LabelGraph(coarse_coord_to_node,
+                                          coarse_node_to_coord);
+
+   // Create coarse graph from fine graph and its labeling
+   Table coarse_graph = BuildCoarseGraph(graph_labeling,
+                                         coarse_node_to_coord.size());
+
+   return Graph(coarse_graph, coarse_coord_to_node, coarse_node_to_coord);
+}
 
 Array<int> Graph::LabelGraph(
-    Array<int> &coarse_node_to_cell, 
-    std::vector<std::vector<int>> &coarse_cell_to_node,
-    const std::unordered_map<Coord, int> &coarse_coord_to_cell,
-    const std::vector<Coord> &coarse_cell_to_coord, 
-    const PixelImage &coarse_image)
+   unordered_map<Coord, vector<int>> &coarse_coord_to_node,
+   vector<Coord> &coarse_node_to_coord)
 {
-    // In each 2x2 block of cells that becomes a coarse cell, there are
-    // coarse nodes for each disjoint connected set of fine nodes. For a
-    // standard coarsening, this gives 1 coarse node for each 2x2 block of fine
-    // cells.
+   // In each 2x2 block of cells that becomes a coarse cell, there are
+   // coarse nodes for each disjoint connected set of fine nodes. For a
+   // standard coarsening, this gives 1 coarse node for each 2x2 block of fine
+   // cells.
+   Array<int> graph_labeling(graph.Size());
+   graph_labeling = -1;
 
-    Array<int> graph_labeling;
-    graph_labeling.SetSize(graph.Size(), -1);
+   // Overlay coarse grid on top of fine grid
+   unordered_map<Coord, vector<int>> coarse_coord_to_fine_node;
+   vector<Coord> fine_node_to_coarse_coord(graph.Size());
+   vector<Coord> coarse_grid_cells;
 
-    // int new_width = coarse_image.Width(), new_height = coarse_image.Height();
-    int fine_ne = cell_to_coord.size();
-    int coarse_ne = coarse_cell_to_coord.size();
-    
+   for (Coord coord : grid_cells)
+   {
+      Coord coarse_coord(coord[0]/2, coord[1]/2);
+      coarse_grid_cells.push_back(coarse_coord);
+      for (int fine_node : coord_to_node[coord])
+      {
+         fine_node_to_coarse_coord[fine_node] = coarse_coord;
+         coarse_coord_to_fine_node[coarse_coord].push_back(fine_node);
+      }
+   }
 
-    /* children and children_offsets utilize a CSR-like structure. For a
-       coarse cell i, its children can be accessed by the indicies from
-       children_offsets[i] up to (not including) children_offsets[i+1].
-    */
-    std::vector<ChildIndex> children(fine_ne);
-    std::vector<int> children_offsets(coarse_ne + 1);
-    int offset = 0;
-    for (int i = 0; i < coarse_ne; ++i)
-    {
-        children_offsets[i] = offset;
+   int coarse_node_counter = 0;
 
-        const Coord coarse_coord = coarse_cell_to_coord[i];
-        Coord fine_coord(2*coarse_coord[0], 2*coarse_coord[1]);
+   for (Coord coarse_coord : coarse_grid_cells)
+   {
+      const auto &fine_nodes = coarse_coord_to_fine_node[coarse_coord];
+      const int n_fine_nodes = fine_nodes.size();
+      vector<set<int>> connected_components(n_fine_nodes);
+      unordered_map<int,int> fine_node_component_index(n_fine_nodes);
 
-        for (int jj = 0; jj < 2; ++jj)
-        {
-            fine_coord[1] += jj;
-            for (int ii = 0; ii < 2; ++ii)
+      auto merge = [&](int i, int j)
+      {
+         const int ci = fine_node_component_index[i];
+         const int cj = fine_node_component_index[j];
+         fine_node_component_index[j] = ci;
+         connected_components[ci].merge(connected_components[cj]);
+      };
+
+      for (int i = 0; i < n_fine_nodes; ++i)
+      {
+         connected_components[i].emplace(fine_nodes[i]);
+         fine_node_component_index[fine_nodes[i]] = i;
+      }
+
+      Array<int> row;
+      for (int fine_node : fine_nodes)
+      {
+         graph.GetRow(fine_node, row);
+         for (int neighbor_fine_node : row)
+         {
+            if (fine_node_to_coarse_coord[neighbor_fine_node] != coarse_coord)
             {
-                fine_coord[0] += ii;
-                const int fine_idx = GetCellIndex(fine_coord);
-                if (fine_idx >= 0)
-                {
-                    children[offset] = {fine_idx, ii + 2*jj};
-                    ++offset;
-                }
-                fine_coord[0] -= ii;
+               continue;
             }
-        fine_coord[1] -= jj;
-        }
-    }
-    children_offsets.back() = offset;
+            merge(fine_node, neighbor_fine_node);
+         }
+      }
 
-    // Create labeling
-    int label = 0;
-    for(int i = 0; i < coarse_ne; ++i)
-    {
-        // Collect all fine nodes in the coarse cell's children
-        std::vector<int> coarse_cell_nodes;
-        for(int j = children_offsets[i]; j < children_offsets[i+1]; ++j)
-        {
-            int fine_cell = children[j].fine_cell;
-            coarse_cell_nodes.insert(
-                coarse_cell_nodes.end(),
-                cell_to_node[fine_cell].begin(),
-                cell_to_node[fine_cell].end());
-        }
+      vector<int> nonempty_component_index(n_fine_nodes);
+      int nonempty_component_counter = 0;
+      for (int i = 0; i < n_fine_nodes; ++i)
+      {
+         if (!connected_components[i].empty())
+         {
+            nonempty_component_index[i] = nonempty_component_counter;
+            coarse_coord_to_node[coarse_coord].push_back(coarse_node_counter +
+                                                         nonempty_component_counter);
+            ++nonempty_component_counter;
+         }
+         else
+         {
+            nonempty_component_index[i] = -1;
+         }
+      }
 
-        // Add distinct label to each connected component among the fine nodes
-        std::vector<bool> visited(coarse_cell_nodes.size(), false);
-        for(int j = 0; j < coarse_cell_nodes.size(); ++j)
-        {
-            if(visited[j]) { continue; }
+      for (int fine_node : fine_nodes)
+      {
+         graph_labeling[fine_node] = coarse_node_counter +
+                                     nonempty_component_index[fine_node_component_index[fine_node]];
+      }
 
-            graph_labeling[coarse_cell_nodes[j]] = label;
-            visited[j] = true;
-            for(int k = j+1; k < coarse_cell_nodes.size(); ++k)
-            {
-                if(visited[k]) { continue; }
+      coarse_node_counter += nonempty_component_counter;
+   }
 
-                if(graph(coarse_cell_nodes[j],coarse_cell_nodes[k]) >= 0)
-                {
-                    graph_labeling[coarse_cell_nodes[k]] = label;
-                    visited[k] = true;
-                }
-            }
-            coarse_cell_to_node[i].push_back(label);
-            coarse_node_to_cell.Append(i);
-            label++;
-        }
-    }
-    
-    return graph_labeling;
+   coarse_node_to_coord.resize(coarse_node_counter);
+   for (Coord coarse_coord : coarse_grid_cells)
+   {
+      for (int coarse_node : coarse_coord_to_node[coarse_coord])
+      {
+         coarse_node_to_coord[coarse_node] = coarse_coord;
+      }
+   }
+
+   return graph_labeling;
 }
 
 Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
-        int coarse_ne) 
+                              int coarse_ne)
 {
-    // Build connectivity matrix
-    Table P(graph.Size(), coarse_ne);
-    for(int i = 0; i < graph.Size(); ++i)
-    {
-        P.Push(i, graph_labeling[i]);
-    }
-    P.Finalize();
+   // Build connectivity matrix
+   Table P(graph.Size(), 1);
+   for (int i = 0; i < graph.Size(); ++i)
+   {
+      P.GetRow(i)[0] = graph_labeling[i];
+   }
 
-    // Build coarse graph
-    // G_coarse = P^T * G_fine * P
-    Table coarse_graph(coarse_ne, coarse_ne);
-    Table Pt;
-    Table temp;
+   unique_ptr<Table> Pt(Transpose(P));
 
-    Transpose(P, Pt, coarse_ne);
-    Pt.Finalize();
-    
-    Mult(Pt, graph, temp);
-    Mult(temp, P, coarse_graph);
+   // Build coarse graph
+   // G_coarse = P^T * G_fine * P
+   Table coarse_graph;
+   Table temp;
 
-    // Remove self-connections in graph
-    RemoveSelfConnections(coarse_graph);
+   Mult(*Pt, graph, temp);
+   Mult(temp, P, coarse_graph);
 
-    coarse_graph.Finalize();
-    return coarse_graph;
+   Table coarse_graph_fixed;
+   coarse_graph_fixed.MakeI(coarse_graph.Size());
+   Array<int> row;
+   for (int i = 0; i < coarse_graph.Size(); ++i)
+   {
+      coarse_graph.GetRow(i, row);
+      for (int j = 0; j < row.Size(); ++j)
+      {
+         if (row[j] != i) { coarse_graph_fixed.AddAColumnInRow(i); }
+      }
+   }
+   coarse_graph_fixed.MakeJ();
+   for (int i = 0; i < coarse_graph.Size(); ++i)
+   {
+      coarse_graph.GetRow(i, row);
+      int k = 0;
+      for (int j = 0; j < row.Size(); ++j)
+      {
+         if (row[j] != i)
+         {
+            coarse_graph_fixed.GetRow(i)[k] = row[j];
+            ++k;
+         }
+      }
+   }
+
+   return coarse_graph_fixed;
 }

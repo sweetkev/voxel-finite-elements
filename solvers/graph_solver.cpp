@@ -50,10 +50,9 @@ int main(int argc, char *argv[])
 
     //create multigrid operator
     //create reference mesh
-    Mesh reference_mesh;
-    CreateReferenceMesh(reference_mesh, mesh.GetMesh().Dimension());
-    H1_FECollection reference_fec(order, reference_mesh.Dimension());
-    FiniteElementSpace reference_fes(&reference_mesh, &reference_fec);
+    // Mesh reference_mesh = CreateReferenceMesh(mesh.GetMesh().Dimension());
+    // H1_FECollection reference_fec(order, reference_mesh.Dimension());
+    // FiniteElementSpace reference_fes(&reference_mesh, &reference_fec);
 
     Graph fine_graph(fes, image);
     Graph coarse_graph = fine_graph.CoarsenGraph();
