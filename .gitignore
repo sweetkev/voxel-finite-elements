@@ -34,6 +34,8 @@
 dirichlet_2d
 graph_solver_2d
 
+*.dSYM
+
 ### VisualStudioCode ###
 .vscode/
 .vscode/*
