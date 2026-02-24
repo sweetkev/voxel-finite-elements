@@ -8,6 +8,9 @@
 *.o
 *.obj
 
+# Build directory
+build/
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -60,4 +63,5 @@ graph_solver_2d
 *.mesh
 *.gf
 
+# Configuration files
 Make.user
