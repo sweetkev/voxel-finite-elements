@@ -33,11 +33,11 @@ public:
 private:
     Graph(Table &graph_,
           std::unordered_map<Coord, std::vector<int>> &coord_to_node_,
-          std::vector<Coord> &node_to_coord_);
+          std::vector<Coord> &node_to_coord_, std::vector<Coord> &grid_cells_);
 
     Table graph;
 
-    // Maps between coordiates and cells
+    // Maps between coordiates and nodes
     std::unordered_map<Coord, std::vector<int>> coord_to_node;
     std::vector<Coord> node_to_coord;
     std::vector<Coord> grid_cells; // Occupied grid cells
@@ -48,7 +48,8 @@ private:
      *  cell-to-node map for the coarse graph.
     */
     Array<int> LabelGraph(std::unordered_map<Coord, std::vector<int>> &coarse_coord_to_node,
-                          std::vector<Coord> &coarse_node_to_coord);
+                          std::vector<Coord> &coarse_node_to_coord,
+                          std::vector<Coord> &coarse_grid_cells);
 
     /** Builds coarse graph according to graph labeling */
     Table BuildCoarseGraph(Array<int> &graph_labeling,
