@@ -101,6 +101,13 @@ Graph Graph::CoarsenGraph()
                 coarse_grid_cells);
 }
 
+const Array<int> Graph::GetConnectedNodes(int node)
+{
+   Array<int> connected_nodes;
+   graph.GetRow(node, connected_nodes);
+   return connected_nodes;
+}
+
 Array<int> Graph::LabelGraph(
    unordered_map<Coord, vector<int>> &coarse_coord_to_node,
    vector<Coord> &coarse_node_to_coord,

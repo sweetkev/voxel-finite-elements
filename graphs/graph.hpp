@@ -19,6 +19,12 @@ public:
     /** Returns the mfem table representing the graph */
     const Table &GetGraph() { return graph; }
 
+    /** Returns the array of nodes connected to current node */
+    const Array<int> GetConnectedNodes(int node);
+
+    /** Returns the coord of element e */
+    const Coord &GetElementCoord(int e) { return node_to_coord[e]; }
+
     /** Returns index of the connection between node i and node j.
      * If there is no connection between node i and node j established in the
      * table, then the return value is -1. */

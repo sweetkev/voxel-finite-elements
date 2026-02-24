@@ -107,7 +107,8 @@ std::vector<std::set<int>> GraphOperator::CreateDofGroups()
                 if (neighbor_dof != -1)
                 {
                     int e_index = dofs_per_elem * e + e_dof;
-                    int neighbor_index = dofs_per_elem * neighbor + neighbor_dof;
+                    int neighbor_index = dofs_per_elem * neighbor 
+                                         + neighbor_dof;
                     int ci = element_component_index[e_index];
                     int cj = element_component_index[neighbor_index];
                     if (ci != cj)
@@ -133,10 +134,8 @@ std::vector<std::set<int>> GraphOperator::CreateDofGroups()
 
 int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
 {
-    int e_cell = graph.GetNodeCell(e);
-    int neighbor_cell = graph.GetNodeCell(neighbor);
-    Coord e_coord = graph.GetCellCoord(e_cell);
-    Coord neighbor_coord = graph.GetCellCoord(neighbor_cell);
+    Coord e_coord = graph.GetElementCoord(e);
+    Coord neighbor_coord = graph.GetElementCoord(neighbor);
 
     switch (neighbor_coord[1] - e_coord[1])
     {
@@ -203,11 +202,13 @@ Mesh CreateReferenceMesh(int dim)
 {
     if (dim == 2)
     {
-        return Mesh::MakeCartesian2D(3, 3, Element::QUADRILATERAL, false, 1.0, 1.0, false);
+        return Mesh::MakeCartesian2D(3, 3, Element::QUADRILATERAL, false, 
+                                     1.0, 1.0, false);
     }
     else if (dim == 3)
     {
-        return Mesh::MakeCartesian3D(3, 3, 3, Element::HEXAHEDRON, 1.0, 1.0, 1.0, false);
+        return Mesh::MakeCartesian3D(3, 3, 3, Element::HEXAHEDRON, 
+                                     1.0, 1.0, 1.0, false);
     }
     else
     {
