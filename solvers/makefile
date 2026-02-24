@@ -10,18 +10,42 @@ endif
 
 MFEM_BUILD_DIR = $(MFEM_DIR)
 CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
-
 -include $(CONFIG_MK)
 
-all: dirichlet_2d graph_solver_2d
+BUILD_DIR := build
+
+SRCS := \
+	graph_solver.cpp \
+	$(SRC_DIR)/meshing/ppm.cpp \
+	$(SRC_DIR)/meshing/pixel_mesh.cpp \
+    $(SRC_DIR)/graphs/graph.cpp
+
+OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+
+DEPS := $(OBJS:.o=.d)
+
+INCLUDES := $(MFEM_INCFLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
+CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP
+
+
+all: dirichlet_2d graph_solver
 
 dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
 
-graph_solver: graph_solver.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp $(SRC_DIR)/graphs/graph_operator.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp $(SRC_DIR)/graphs/graph_operator.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
+# graph_solver: graph_solver.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp $(SRC_DIR)/graphs/graph_operator.cpp
+# 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp $(SRC_DIR)/graphs/graph.cpp $(SRC_DIR)/graphs/graph_operator.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
+
+graph_solver: $(OBJS)
+	$(MFEM_CXX) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(MFEM_CXX) $(CXXFLAGS) -c $< -o $@
+
+-include $(DEPS)
 
 .PHONY: clean
 
 clean:
-	rm -f dirichlet_2d graph_solver_2d
+	rm -rf $(BUILD_DIR) dirichlet_2d graph_solver
