@@ -23,15 +23,7 @@ void GraphOperator::CreateDofMap()
     const int dofs_per_elem = ref_dofs.Size();
 
     local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
-
-    // Initialize local dof - to - neighbor dof matrix with -1
-    for (int i = 0; i < local_to_neighbor_dof_map.Width(); ++i)
-    {
-        for (int j = 0; j < local_to_neighbor_dof_map.Height(); ++j)
-        {
-            local_to_neighbor_dof_map(i,j) = -1;
-        }
-    }
+    local_to_neighbor_dof_map = -1;
 
     // For each DoF of reference element, find the neighboring elements who
     // share the Dof
