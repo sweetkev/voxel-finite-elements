@@ -36,6 +36,7 @@ build/
 *.app
 dirichlet_2d
 graph_solver_2d
+graph_solver
 
 *.dSYM
 
