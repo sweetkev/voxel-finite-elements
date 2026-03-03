@@ -6,27 +6,68 @@ using namespace mfem;
 GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     : reference_fes(reference_fes_), graph(graph_)
 {
+    // Build A_ref
+    BuildARef();
+
     // Create map from local dof # to neighboring cells with dof
     CreateDofMap();
 
     // Create dof_groups
     std::vector<std::set<int>> dof_groups = CreateDofGroups();
 
-    // Build Q matrix
-    BuildQ(dof_groups);
+    // Build A matrix
+    BuildA(dof_groups);
+}
+
+GraphOperator GraphOperator::Coarsen()
+{
+    Graph coarse_graph = graph.CoarsenGraph();
+    return GraphOperator(A_ref, reference_fes, coarse_graph);
+}
+
+GraphOperator::GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_fes_, 
+                  Graph &graph_)
+    : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_)
+{
+    // Create map from local dof # to neighboring cells with dof
+    CreateDofMap();
+
+    // Create dof_groups
+    std::vector<std::set<int>> dof_groups = CreateDofGroups();
+
+    // Build A matrix
+    BuildA(dof_groups);
+}
+
+void GraphOperator::BuildARef()
+{
+    Array<int> *ess_dofs = new Array<int>;
+    reference_fes.GetBoundaryTrueDofs(*ess_dofs);
+    BilinearForm a(&reference_fes);
+    a.AddDomainIntegrator(new DiffusionIntegrator);
+    a.Assemble();
+    SparseMatrix large_A = a.SpMat();
+
+    Array<int> ref_dofs;
+    reference_fes.GetElementDofs(4, ref_dofs);
+    
+    const int dofs_per_elem = ref_dofs.Size();
+    A_ref.SetSize(dofs_per_elem, dofs_per_elem);
+    
+    large_A.GetSubMatrix(ref_dofs, ref_dofs, A_ref);
 }
 
 void GraphOperator::CreateDofMap()
 {
-    Array<int> ref_dofs;
-    reference_fes.GetElementDofs(4, ref_dofs);
-    const int dofs_per_elem = ref_dofs.Size();
+    const int dofs_per_elem = A_ref.Height();
 
     local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
     local_to_neighbor_dof_map = -1;
 
     // For each DoF of reference element, find the neighboring elements who
     // share the Dof
+    Array<int> ref_dofs;
+    reference_fes.GetElementDofs(4, ref_dofs);
     for (int i = 0; i < dofs_per_elem; ++i)
     {
         int dof = ref_dofs[i];
@@ -49,9 +90,7 @@ void GraphOperator::CreateDofMap()
 
 std::vector<std::set<int>> GraphOperator::CreateDofGroups()
 {
-    Array<int> ref_dofs;
-    reference_fes.GetElementDofs(0, ref_dofs);
-    const int dofs_per_elem = ref_dofs.Size();
+    const int dofs_per_elem = A_ref.Height();
     const int ne = graph.Size();
     const int nd = dofs_per_elem * ne;
     Array<int> dof_labeling;
@@ -133,7 +172,7 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
     {
         // Bottom elements
         case -1:
-            switch (neighbor_coord[0] - neighbor_coord[0])
+            switch (neighbor_coord[0] - e_coord[0])
             {
                 // Bottom-left element
                 case -1:
@@ -145,11 +184,11 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
                 case 1:
                     return local_to_neighbor_dof_map(e_dof, 2);
                 default:
-                    break;
+                    return -1;
             }
         // Middle elements
         case 0:
-            switch (neighbor_coord[1] - neighbor_coord[1])
+            switch (neighbor_coord[0] - e_coord[0])
             {
                 // Middle-left element
                 case -1:
@@ -161,11 +200,11 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
                 case 1:
                     return local_to_neighbor_dof_map(e_dof, 5);
                 default:
-                    break;
+                    return -1;
             }
         // Top elements
         case 1:
-            switch (neighbor_coord[1] - neighbor_coord[1])
+            switch (neighbor_coord[0] - e_coord[0])
             {
                 // Top-left element
                 case -1:
@@ -177,7 +216,7 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
                 case 1:
                     return local_to_neighbor_dof_map(e_dof, 8);
                 default:
-                    break;
+                    return -1;
             }
 
         default:
@@ -185,9 +224,50 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
     }
 }
 
-void GraphOperator::BuildQ(std::vector<std::set<int>> dof_groups)
+void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 {
+    // This method feels very unoptimized. The matrices are very sparse and
+    // have a lot of structure, which could be explioted. However, this should
+    // work, and was the most direct way I could see using MFEM's existing
+    // methods.
 
+    // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
+    // global dof j, and 0 otherwise.
+    
+    const int dofs_per_elem = A_ref.Height();
+    const int ne = graph.Size();
+    const int total_dofs = dofs_per_elem * ne;
+    
+    SparseMatrix Lambda(total_dofs, dof_groups.size());
+    for (int global_dof = 0; global_dof < dof_groups.size(); ++global_dof)
+    {
+        std::set<int> group = dof_groups[global_dof];
+        for(int broken_dof : group)
+        {
+            Lambda.Add(broken_dof, global_dof, 1.0);
+        }
+    }
+
+    // Build hat{A} matrix. (This feels like a very silly way of doing this,
+    // but it should work)
+    SparseMatrix A_hat(total_dofs, total_dofs);
+    
+    for (int e = 0; e < graph.Size(); ++e)
+    {
+        Array<int> block_indices(dofs_per_elem);
+        for (int i = 0; i < dofs_per_elem; ++i)
+        {
+            block_indices[i] = e * dofs_per_elem + i;
+        }
+        A_hat.AddSubMatrix(block_indices, block_indices, A_ref);
+    }
+
+    // Finalize matrices before RAP operation
+    Lambda.Finalize();
+    A_hat.Finalize();
+
+    // Compute A = Lambda^T * hat{A} * Lambda
+    A = *RAP(A_hat, Lambda);
 }
 
 Mesh CreateReferenceMesh(int dim)

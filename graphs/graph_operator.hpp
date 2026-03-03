@@ -13,8 +13,13 @@ class GraphOperator
 public:
     GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_);
 
+    // Builds the coarse graph operator by coarsening the fine graph operator.
+    GraphOperator Coarsen();
+
+    SparseMatrix &GetMatrix() { return A; }
+
 private:
-    Array<int> A_ref;
+    DenseMatrix A_ref;
     FiniteElementSpace reference_fes;
 
     // Matrix whose (i,j) entry denotes the local dof number on reference
@@ -22,8 +27,16 @@ private:
     // the central reference element.
     DenseMatrix local_to_neighbor_dof_map;
 
-    SparseMatrix Q;
+    SparseMatrix A;
     Graph graph;
+
+    GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_fes_, 
+                  Graph &graph_);
+
+    /** Builds the matrix A_ref representing the stiffness matrix over the
+     * reference element.
+     */
+    void BuildARef();
 
     /** Creates the table whose ith row represents a local dof number
      *  and jth column represents a reference cell in the reference mesh
@@ -41,8 +54,12 @@ private:
     */
     int GetNeighborDof(int e, int e_dof, int neighbor);
 
-    /** Builds matrix Q such that A = Q^T ~A Q */
-    void BuildQ(std::vector<std::set<int>> dof_groups);
+    /** Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
+     * hat{A} is the block diagonal matrix with blocks corresponding to the 
+     * local element matrix A_ref, and Lambda is the boolean matrix mapping the
+     * broken dofs to the global dofs.
+     */
+    void BuildA(std::vector<std::set<int>> dof_groups);
 };
 
 /** Builds mesh which contains all neighbor information for a single element.
