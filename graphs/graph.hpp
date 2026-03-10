@@ -25,6 +25,9 @@ public:
     /** Returns the coord of element e */
     const Coord &GetElementCoord(int e) { return node_to_coord[e]; }
 
+    /** Returns the occupied grid cells */
+    const std::vector<Coord> &GetGridCells() { return grid_cells; }
+
     /** Returns index of the connection between node i and node j.
      * If there is no connection between node i and node j established in the
      * table, then the return value is -1. */

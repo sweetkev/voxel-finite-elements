@@ -39,6 +39,54 @@ GraphOperator::GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_
     BuildA(dof_groups);
 }
 
+SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
+                                               Graph &fine_graph)
+{
+    int dofs_per_elem = A_ref.Height();
+    SparseMatrix P(graph.Size()*dofs_per_elem, fine_graph.Size()*dofs_per_elem);
+
+    for (int i = 0; i < graph.Size(); ++i)
+    {
+        // TODO: Generalize to n-dimensions
+        // Currently assumes 2D
+        Coord e_coord = graph.GetElementCoord(i);
+        for (int j = 0; j < 2; ++j)
+        {
+            for (int k = 0; k < 2; ++k)
+            {
+                Coord fine_coord(e_coord[0] + j, e_coord[1] + k);
+                const std::vector<Coord> &fine_grid_cells = fine_graph.GetGridCells();
+                auto it = std::find(fine_grid_cells.begin(), fine_grid_cells.end(), 
+                                    fine_coord);
+            
+                if (it != fine_grid_cells.end())
+                {
+                    int neighbor_index = std::distance(fine_grid_cells.begin(), it);
+
+                    Array<int> rows(local_prolongation.SizeI());
+                    Array<int> cols(local_prolongation.SizeJ());
+
+                    for (int r = 0; r < rows.Size(); ++r)
+                    {
+                        rows[r] = rows.Size() * neighbor_index + r;
+                    }
+
+                    for (int c = 0; c < cols.Size(); ++c)
+                    {
+                        cols[c] = cols.Size() * i + c;
+                    }
+
+                    P.AddSubMatrix(rows, cols, local_prolongation(j + 2*k));
+                }
+            }
+        }    
+    }
+
+    RemoveBoundaryDofs(P);
+
+    return P;
+}
+
 void GraphOperator::BuildARef()
 {
     Array<int> *ess_dofs = new Array<int>;
@@ -268,6 +316,56 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 
     // Compute A = Lambda^T * hat{A} * Lambda
     A = *RAP(A_hat, Lambda);
+}
+
+void GraphOperator::RemoveBoundaryDofs(SparseMatrix &P)
+{ 
+    const int dofs_per_elem = A_ref.Height();
+    for (int e = 0; e < graph.Size(); ++e)
+    {
+        Array<int> connected_elements = graph.GetConnectedNodes(e);
+        for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
+        {
+            // Skip if interior dof
+            bool interior_dof = true;
+            for (int j = 0; j < 9; ++j)
+            {
+                if (local_to_neighbor_dof_map(e_dof,j) != -1)
+                {
+                    interior_dof = false;
+                }
+            }
+            if (interior_dof) { continue; }
+
+            // Check if dof is on boundary
+            Coord e_coord = graph.GetElementCoord(e);
+            Array<int> neighbors_to_check(9);
+            neighbors_to_check = -1;
+            for (int i = 0; i < 9; ++i)
+            {
+                if (local_to_neighbor_dof_map(e_dof,i) != -1)
+                {
+                    neighbors_to_check[i] = 1;
+                }
+            }
+
+            for (int element : connected_elements)
+            {
+                Coord neighbor_coord = graph.GetElementCoord(element);
+                int neighbor_index = (neighbor_coord[0] - e_coord[0] + 1)
+                                     + 3*(neighbor_coord[1] - e_coord[1] + 1);
+                neighbors_to_check[neighbor_index] = -1;
+            }
+
+            for (int neighbor : neighbors_to_check)
+            {
+                if (neighbor == 1)
+                {
+                    P.EliminateRow(e * dofs_per_elem + e_dof);
+                }
+            }
+        }
+    }
 }
 
 Mesh CreateReferenceMesh(int dim)

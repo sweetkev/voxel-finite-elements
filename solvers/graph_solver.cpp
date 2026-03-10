@@ -64,43 +64,35 @@ int main(int argc, char *argv[])
     SparseMatrix coarse_A = coarse_graph_operator.GetMatrix();
 
     // Create prolongation operator from coarse to fine space
-    // This is where I feel least comfortable. Below is the code that was
-    // talked about several weeks ago.
+    // Ensure reference element fespace matches the others used
+    Mesh reference_element = Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL);
+    H1_FECollection single_fec(order, reference_element.Dimension());
+    FiniteElementSpace single_fes(&reference_element, &single_fec);
 
-    // Mesh mesh_ = Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL);
+    reference_element.UniformRefinement();
+    single_fes.Update();
 
-    // H1_FECollection fec(5, mesh_.Dimension());
-    // FiniteElementSpace fespace(&mesh_, &fec);
+    const Geometry::Type geom = Geometry::SQUARE;
 
-    // mesh_.UniformRefinement();
-    // fespace.Update();
+    const CoarseFineTransformations &rtrans = reference_element.GetRefinementTransforms();
+    const DenseTensor &pmats = rtrans.point_matrices[geom];
+    const int nmat = pmats.SizeK();
 
-    // const Geometry::Type geom = Geometry::SQUARE;
+    const FiniteElement *fe = single_fes.GetFE(0);
+    const int ldof = fe->GetDof();
 
-    // const CoarseFineTransformations &rtrans = mesh_.GetRefinementTransforms();
-    // const DenseTensor &pmats = rtrans.point_matrices[geom];
-    // const int nmat = pmats.SizeK();
+    IsoparametricTransformation isotr;
+    isotr.SetIdentityTransformation(geom);
 
-    // const FiniteElement *fe = fespace.GetFE(0);
-    // const int ldof = fe->GetDof();
+    DenseTensor local_prolongation(ldof, ldof, nmat);
 
-    // IsoparametricTransformation isotr;
-    // isotr.SetIdentityTransformation(geom);
+    for (int i = 0; i < nmat; i++)
+    {
+        isotr.SetPointMat(pmats(i));
+        fe->GetLocalInterpolation(isotr, local_prolongation(i));
+    }
 
-    // DenseMatrix P(ldof, ldof);
-
-    // for (int i = 0; i < nmat; i++)
-    // {
-    //     cout << "Matrix " << i << "\n";
-    //     cout << "====================\n";
-
-    //     isotr.SetPointMat(pmats(i));
-    //     fe->GetLocalInterpolation(isotr, P);
-
-    //     P.Print(cout, 4);
-
-    //     cout << "\n\n";
-    // }
+    SparseMatrix P = coarse_graph_operator.CreateProlongation(local_prolongation, fine_graph);
 
     // // Create multigrid hierarchy
     // Array<Operator*> operators(2);

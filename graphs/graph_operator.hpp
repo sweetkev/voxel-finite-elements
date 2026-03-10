@@ -18,6 +18,12 @@ public:
 
     SparseMatrix &GetMatrix() { return A; }
 
+    /** Builds prolongartion matrix from coarse space to fine space using the 
+    *   local prolongation defined on the reference element.
+    */
+    SparseMatrix CreateProlongation(DenseTensor &local_prolongation, 
+                                    Graph &fine_graph);
+
 private:
     DenseMatrix A_ref;
     FiniteElementSpace reference_fes;
@@ -34,7 +40,7 @@ private:
                   Graph &graph_);
 
     /** Builds the matrix A_ref representing the stiffness matrix over the
-     * reference element.
+     *  reference element.
      */
     void BuildARef();
 
@@ -55,11 +61,14 @@ private:
     int GetNeighborDof(int e, int e_dof, int neighbor);
 
     /** Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
-     * hat{A} is the block diagonal matrix with blocks corresponding to the 
-     * local element matrix A_ref, and Lambda is the boolean matrix mapping the
-     * broken dofs to the global dofs.
+     *  hat{A} is the block diagonal matrix with blocks corresponding to the 
+     *  local element matrix A_ref, and Lambda is the boolean matrix mapping the
+     *  broken dofs to the global dofs.
      */
     void BuildA(std::vector<std::set<int>> dof_groups);
+
+    // Removes boundary dofs from the prolongation matrix P.
+    void RemoveBoundaryDofs(SparseMatrix &P);
 };
 
 /** Builds mesh which contains all neighbor information for a single element.
