@@ -43,7 +43,8 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                                                Graph &fine_graph)
 {
     int dofs_per_elem = A_ref.Height();
-    SparseMatrix P(graph.Size()*dofs_per_elem, fine_graph.Size()*dofs_per_elem);
+    SparseMatrix P(fine_graph.Size()*dofs_per_elem,
+                   graph.Size()*dofs_per_elem);
 
     for (int i = 0; i < graph.Size(); ++i)
     {
@@ -63,17 +64,21 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                 {
                     int neighbor_index = std::distance(fine_grid_cells.begin(), it);
 
-                    Array<int> rows(local_prolongation.SizeI());
-                    Array<int> cols(local_prolongation.SizeJ());
+                    // prepare row/column index arrays for the submatrix.
+                    // rows correspond to fine-graph dofs, cols to coarse-graph dofs.
+                    const int nd = local_prolongation.SizeI();
+                    const int nc = local_prolongation.SizeJ();
+                    Array<int> rows(nd);
+                    Array<int> cols(nc);
 
-                    for (int r = 0; r < rows.Size(); ++r)
+                    for (int r = 0; r < nd; ++r)
                     {
-                        rows[r] = rows.Size() * neighbor_index + r;
+                        rows[r] = nd * neighbor_index + r;
                     }
 
-                    for (int c = 0; c < cols.Size(); ++c)
+                    for (int c = 0; c < nc; ++c)
                     {
-                        cols[c] = cols.Size() * i + c;
+                        cols[c] = nc * i + c;
                     }
 
                     P.AddSubMatrix(rows, cols, local_prolongation(j + 2*k));
@@ -362,6 +367,11 @@ void GraphOperator::RemoveBoundaryDofs(SparseMatrix &P)
                 if (neighbor == 1)
                 {
                     P.EliminateRow(e * dofs_per_elem + e_dof);
+
+                    // Also remove boundary condition from A. This should
+                    // probably be implemented elsewhere, but this is most
+                    // efficient for now.
+                    A.EliminateRow(e * dofs_per_elem + e_dof, Operator::DIAG_ONE);
                 }
             }
         }

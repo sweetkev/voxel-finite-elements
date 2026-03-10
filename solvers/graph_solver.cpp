@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
     Graph coarse_graph = fine_graph.CoarsenGraph();
     
     GraphOperator coarse_graph_operator(reference_fes, coarse_graph);
-    SparseMatrix coarse_A = coarse_graph_operator.GetMatrix();
 
     // Create prolongation operator from coarse to fine space
     // Ensure reference element fespace matches the others used
@@ -92,41 +91,43 @@ int main(int argc, char *argv[])
         fe->GetLocalInterpolation(isotr, local_prolongation(i));
     }
 
-    SparseMatrix P = coarse_graph_operator.CreateProlongation(local_prolongation, fine_graph);
+    SparseMatrix *P = new SparseMatrix(coarse_graph_operator.CreateProlongation(local_prolongation, fine_graph));
+    SparseMatrix *coarse_A = new SparseMatrix(coarse_graph_operator.GetMatrix());
 
-    // // Create multigrid hierarchy
-    // Array<Operator*> operators(2);
-    // Array<Solver*> smoothers(2);
-    // Array<Operator*> prolongations(1);
-    // Array<bool> own_operators(2);
-    // Array<bool> own_smoothers(2);
-    // Array<bool> own_prolongations(1);
+    // Create multigrid hierarchy
+    Array<Operator*> operators(2);
+    Array<Solver*> smoothers(2);
+    Array<Operator*> prolongations(1);
+    Array<bool> own_operators(2);
+    Array<bool> own_smoothers(2);
+    Array<bool> own_prolongations(1);
 
-    // operators[0] = &coarse_A;
-    // operators[1] = &A;
+    operators[0] = coarse_A;
+    operators[1] = &A;
 
-    // smoothers[0] = new UMFPackSolver(A);
-    // smoothers[1] = new GSSmoother(coarse_A);
+    smoothers[0] = new GSSmoother(*coarse_A);
+    smoothers[1] = new UMFPackSolver(A);
 
-    // prolongations[0] = &P;
+    prolongations[0] = P;
 
-    // own_operators = false;
-    // own_smoothers = false;
-    // own_prolongations = false;
+    own_operators[0] = true;
+    own_operators[1] = false;
+    own_smoothers = true;
+    own_prolongations = true;
 
-    // Multigrid mg(operators, smoothers, prolongations, own_operators, 
-    //              own_smoothers, own_prolongations);
+    Multigrid mg(operators, smoothers, prolongations, own_operators, 
+                 own_smoothers, own_prolongations);
 
-    // //solve problem
-    // CGSolver cg;
-    // cg.SetRelTol(1e-12);
-    // cg.SetMaxIter(2000);
-    // cg.SetPrintLevel(1);
-    // cg.SetOperator(A);
-    // cg.SetPreconditioner(mg);
-    // cg.Mult(B, X);
+    //solve problem
+    CGSolver cg;
+    cg.SetRelTol(1e-12);
+    cg.SetMaxIter(2000);
+    cg.SetPrintLevel(1);
+    cg.SetOperator(A);
+    cg.SetPreconditioner(mg);
+    cg.Mult(B, X);
 
-    // a.RecoverFEMSolution(X,b,x);
-    // x.Save("sol.gf");
-    // mesh.GetMesh().Save("mesh.mesh");
+    a.RecoverFEMSolution(X,b,x);
+    x.Save("sol.gf");
+    mesh.GetMesh().Save("mesh.mesh");
 }
