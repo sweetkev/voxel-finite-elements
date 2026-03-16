@@ -21,8 +21,12 @@ public:
     /** Builds prolongartion matrix from coarse space to fine space using the 
     *   local prolongation defined on the reference element.
     */
-    SparseMatrix CreateProlongation(DenseTensor &local_prolongation, 
-                                    Graph &fine_graph);
+    SparseMatrix CreateProlongation(DenseTensor &local_prolongation,
+                                    Graph &fine_graph,
+                                    const std::vector<int> &fine_broken_to_true_dof);
+
+    /// Returns mapping from broken (element-local) dofs to true global dofs.
+    const std::vector<int> &GetBrokenDofToTrueDofMap() const { return broken_dof_to_true_dof; }
 
 private:
     DenseMatrix A_ref;
@@ -32,6 +36,10 @@ private:
     // element j which is identified with the local dof i on
     // the central reference element.
     DenseMatrix local_to_neighbor_dof_map;
+
+    // Maps each broken (element-local) dof index to the global true-dof index.
+    // Size is (#elements * dofs_per_element).
+    std::vector<int> broken_dof_to_true_dof;
 
     SparseMatrix A;
     Graph graph;
@@ -67,8 +75,10 @@ private:
      */
     void BuildA(std::vector<std::set<int>> dof_groups);
 
-    // Removes boundary dofs from the prolongation matrix P.
-    void RemoveBoundaryDofs(SparseMatrix &P);
+    // Removes boundary dofs from the sparsematrix B
+    void RemoveBoundaryDofs(SparseMatrix &B, 
+                            Operator::DiagonalPolicy dpolicy);
+
 };
 
 /** Builds mesh which contains all neighbor information for a single element.

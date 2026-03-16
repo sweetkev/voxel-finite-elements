@@ -1,5 +1,6 @@
 #include "graph_operator.hpp"
 #include "mfem.hpp"
+#include <iostream>
 
 using namespace mfem;
 
@@ -40,12 +41,36 @@ GraphOperator::GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_
 }
 
 SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
-                                               Graph &fine_graph)
+                                               Graph &fine_graph,
+                                               const std::vector<int> &fine_broken_to_true_dof)
 {
     int dofs_per_elem = A_ref.Height();
-    SparseMatrix P(fine_graph.Size()*dofs_per_elem,
-                   graph.Size()*dofs_per_elem);
 
+    // The prolongation maps true coarse dofs to true fine dofs.
+    // The true dof count is determined by the broken->true mapping.
+    int fine_true_dofs = 0;
+    for (int v : fine_broken_to_true_dof)
+    {
+        if (v < 0)
+        {
+            MFEM_ABORT("Invalid fine broken->true dof mapping in CreateProlongation.");
+        }
+        fine_true_dofs = std::max(fine_true_dofs, v + 1);
+    }
+
+    int coarse_true_dofs = 0;
+    for (int v : broken_dof_to_true_dof)
+    {
+        if (v < 0)
+        {
+            MFEM_ABORT("Invalid coarse broken->true dof mapping in CreateProlongation.");
+        }
+        coarse_true_dofs = std::max(coarse_true_dofs, v + 1);
+    }
+
+    SparseMatrix P(fine_true_dofs, coarse_true_dofs);
+
+    // Build prolongation in true DOF space using the broken->true mapping.
     for (int i = 0; i < graph.Size(); ++i)
     {
         // TODO: Generalize to n-dimensions
@@ -55,7 +80,7 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
         {
             for (int k = 0; k < 2; ++k)
             {
-                Coord fine_coord(e_coord[0] + j, e_coord[1] + k);
+                Coord fine_coord(2 * e_coord[0] + j, 2 * e_coord[1] + k);
                 const std::vector<Coord> &fine_grid_cells = fine_graph.GetGridCells();
                 auto it = std::find(fine_grid_cells.begin(), fine_grid_cells.end(), 
                                     fine_coord);
@@ -64,30 +89,35 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                 {
                     int neighbor_index = std::distance(fine_grid_cells.begin(), it);
 
-                    // prepare row/column index arrays for the submatrix.
-                    // rows correspond to fine-graph dofs, cols to coarse-graph dofs.
-                    const int nd = local_prolongation.SizeI();
-                    const int nc = local_prolongation.SizeJ();
-                    Array<int> rows(nd);
-                    Array<int> cols(nc);
+                    int coarse_base = i * dofs_per_elem;
+                    int fine_base = neighbor_index * dofs_per_elem;
 
-                    for (int r = 0; r < nd; ++r)
+                    // Insert into P using true global dof indices.
+                    for (int rf = 0; rf < dofs_per_elem; ++rf)
                     {
-                        rows[r] = nd * neighbor_index + r;
-                    }
+                        const int fine_tdof = fine_broken_to_true_dof[fine_base + rf];
+                        if (fine_tdof < 0) { continue; }
+                        for (int rc = 0; rc < dofs_per_elem; ++rc)
+                        {
+                            const int coarse_tdof = broken_dof_to_true_dof[coarse_base + rc];
+                            if (coarse_tdof < 0) { continue; }
 
-                    for (int c = 0; c < nc; ++c)
-                    {
-                        cols[c] = nc * i + c;
+                            const double val = local_prolongation(j + 2*k)(rf, rc);
+                            if (val != 0.0)
+                            {
+                                P.Add(fine_tdof, coarse_tdof, val);
+                            }
+                        }
                     }
-
-                    P.AddSubMatrix(rows, cols, local_prolongation(j + 2*k));
                 }
             }
         }    
     }
 
-    RemoveBoundaryDofs(P);
+    // Remove boundary dofs (now correctly implemented in true DOF space)
+    RemoveBoundaryDofs(P, Operator::DIAG_ZERO);
+
+    P.Finalize();
 
     return P;
 }
@@ -151,10 +181,11 @@ std::vector<std::set<int>> GraphOperator::CreateDofGroups()
     std::vector<int> element_component_index(nd);
     std::vector<std::set<int>> connected_components(nd);
 
-    // Initialize E_i = { i }
+    // Initialize E_i = { i } and component index
     for (int i = 0; i < nd; ++i)
     {
         connected_components[i].emplace(i);
+        element_component_index[i] = i;
     }
 
     // merges connected component j into connected component i
@@ -285,19 +316,23 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
     // methods.
 
     // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
-    // global dof j, and 0 otherwise.
+    // true global dof j, and 0 otherwise.
     
     const int dofs_per_elem = A_ref.Height();
     const int ne = graph.Size();
     const int total_dofs = dofs_per_elem * ne;
-    
+
+    // Map from broken dof to global dof (true dof numbering)
+    broken_dof_to_true_dof.assign(total_dofs, -1);
+
     SparseMatrix Lambda(total_dofs, dof_groups.size());
     for (int global_dof = 0; global_dof < dof_groups.size(); ++global_dof)
     {
-        std::set<int> group = dof_groups[global_dof];
-        for(int broken_dof : group)
+        const std::set<int> &group = dof_groups[global_dof];
+        for (int broken_dof : group)
         {
             Lambda.Add(broken_dof, global_dof, 1.0);
+            broken_dof_to_true_dof[broken_dof] = global_dof;
         }
     }
 
@@ -320,58 +355,82 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
     A_hat.Finalize();
 
     // Compute A = Lambda^T * hat{A} * Lambda
-    A = *RAP(A_hat, Lambda);
+    A = *RAP(Lambda, A_hat, Lambda);
+
+    // Eliminate boundary dofs from coarse operator
+    RemoveBoundaryDofs(A, Operator::DIAG_ONE);
 }
 
-void GraphOperator::RemoveBoundaryDofs(SparseMatrix &P)
+void GraphOperator::RemoveBoundaryDofs(SparseMatrix &B, 
+                                       Operator::DiagonalPolicy dpolicy)
 { 
     const int dofs_per_elem = A_ref.Height();
-    for (int e = 0; e < graph.Size(); ++e)
+    const int ne = graph.Size();
+
+    // Identify and eliminate boundary dofs
+    for (int e = 0; e < ne; ++e)
     {
         Array<int> connected_elements = graph.GetConnectedNodes(e);
+        
         for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
         {
             // Skip if interior dof
             bool interior_dof = true;
             for (int j = 0; j < 9; ++j)
             {
-                if (local_to_neighbor_dof_map(e_dof,j) != -1)
+                if (local_to_neighbor_dof_map(e_dof, j) != -1)
                 {
                     interior_dof = false;
+                    break;
                 }
             }
             if (interior_dof) { continue; }
 
-            // Check if dof is on boundary
+            // Check if this dof is on the boundary of the domain
+            // A dof is on the boundary if it has a potential neighbor direction
+            // but that neighbor doesn't actually exist in the graph
             Coord e_coord = graph.GetElementCoord(e);
-            Array<int> neighbors_to_check(9);
-            neighbors_to_check = -1;
-            for (int i = 0; i < 9; ++i)
+            bool on_boundary = false;
+
+            // Check all 8 potential neighbor directions (skip center element 4)
+            for (int neighbor_dir = 0; neighbor_dir < 9; ++neighbor_dir)
             {
-                if (local_to_neighbor_dof_map(e_dof,i) != -1)
+                if (neighbor_dir == 4) continue;
+                
+                if (local_to_neighbor_dof_map(e_dof, neighbor_dir) != -1)
                 {
-                    neighbors_to_check[i] = 1;
+                    // Convert direction index to coordinate offset
+                    int dx = (neighbor_dir % 3) - 1;  // -1, 0, or 1
+                    int dy = (neighbor_dir / 3) - 1;  // -1, 0, or 1
+                    Coord neighbor_coord(e_coord[0] + dx, e_coord[1] + dy);
+
+                    // Check if this neighbor exists in the graph
+                    bool neighbor_exists = false;
+                    for (int neighbor : connected_elements)
+                    {
+                        if (graph.GetElementCoord(neighbor) == neighbor_coord)
+                        {
+                            neighbor_exists = true;
+                            break;
+                        }
+                    }
+
+                    if (!neighbor_exists)
+                    {
+                        on_boundary = true;
+                        break;
+                    }
                 }
             }
 
-            for (int element : connected_elements)
+            if (on_boundary)
             {
-                Coord neighbor_coord = graph.GetElementCoord(element);
-                int neighbor_index = (neighbor_coord[0] - e_coord[0] + 1)
-                                     + 3*(neighbor_coord[1] - e_coord[1] + 1);
-                neighbors_to_check[neighbor_index] = -1;
-            }
-
-            for (int neighbor : neighbors_to_check)
-            {
-                if (neighbor == 1)
+                int broken_dof_index = e * dofs_per_elem + e_dof;
+                int true_dof_index = broken_dof_to_true_dof[broken_dof_index];
+                
+                if (true_dof_index >= 0)
                 {
-                    P.EliminateRow(e * dofs_per_elem + e_dof);
-
-                    // Also remove boundary condition from A. This should
-                    // probably be implemented elsewhere, but this is most
-                    // efficient for now.
-                    A.EliminateRow(e * dofs_per_elem + e_dof, Operator::DIAG_ONE);
+                    B.EliminateRow(true_dof_index, dpolicy);
                 }
             }
         }

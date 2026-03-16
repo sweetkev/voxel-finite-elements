@@ -59,8 +59,10 @@ int main(int argc, char *argv[])
 
     // Create coarse graph and its corresponding operator
     Graph coarse_graph = fine_graph.CoarsenGraph();
-    
     GraphOperator coarse_graph_operator(reference_fes, coarse_graph);
+
+    // Create a GraphOperator for the fine graph to get the broken->true dof map
+    GraphOperator fine_graph_operator(reference_fes, fine_graph);
 
     // Create prolongation operator from coarse to fine space
     // Ensure reference element fespace matches the others used
@@ -91,7 +93,10 @@ int main(int argc, char *argv[])
         fe->GetLocalInterpolation(isotr, local_prolongation(i));
     }
 
-    SparseMatrix *P = new SparseMatrix(coarse_graph_operator.CreateProlongation(local_prolongation, fine_graph));
+    SparseMatrix *P = new SparseMatrix(coarse_graph_operator.CreateProlongation(
+        local_prolongation,
+        fine_graph,
+        fine_graph_operator.GetBrokenDofToTrueDofMap()));
     SparseMatrix *coarse_A = new SparseMatrix(coarse_graph_operator.GetMatrix());
 
     // Create multigrid hierarchy
@@ -105,8 +110,8 @@ int main(int argc, char *argv[])
     operators[0] = coarse_A;
     operators[1] = &A;
 
-    smoothers[0] = new GSSmoother(*coarse_A);
-    smoothers[1] = new UMFPackSolver(A);
+    smoothers[0] = new UMFPackSolver(*coarse_A);
+    smoothers[1] = new GSSmoother(A);
 
     prolongations[0] = P;
 
@@ -114,6 +119,7 @@ int main(int argc, char *argv[])
     own_operators[1] = false;
     own_smoothers = true;
     own_prolongations = true;
+
 
     Multigrid mg(operators, smoothers, prolongations, own_operators, 
                  own_smoothers, own_prolongations);
