@@ -227,60 +227,9 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
     Coord e_coord = graph.GetElementCoord(e);
     Coord neighbor_coord = graph.GetElementCoord(neighbor);
 
-    switch (neighbor_coord[1] - e_coord[1])
-    {
-        // Bottom elements
-        case -1:
-            switch (neighbor_coord[0] - e_coord[0])
-            {
-                // Bottom-left element
-                case -1:
-                    return local_to_neighbor_dof_map(e_dof, 0);
-                // Bottom-middle element
-                case 0:
-                    return local_to_neighbor_dof_map(e_dof, 1);
-                // Bottom-right element
-                case 1:
-                    return local_to_neighbor_dof_map(e_dof, 2);
-                default:
-                    return -1;
-            }
-        // Middle elements
-        case 0:
-            switch (neighbor_coord[0] - e_coord[0])
-            {
-                // Middle-left element
-                case -1:
-                    return local_to_neighbor_dof_map(e_dof, 3);
-                // Middle-middle element
-                case 0:
-                    return local_to_neighbor_dof_map(e_dof, 4);
-                // Middle-right element
-                case 1:
-                    return local_to_neighbor_dof_map(e_dof, 5);
-                default:
-                    return -1;
-            }
-        // Top elements
-        case 1:
-            switch (neighbor_coord[0] - e_coord[0])
-            {
-                // Top-left element
-                case -1:
-                    return local_to_neighbor_dof_map(e_dof, 6);
-                // Top-middle element
-                case 0:
-                    return local_to_neighbor_dof_map(e_dof, 7);
-                // Top-right element
-                case 1:
-                    return local_to_neighbor_dof_map(e_dof, 8);
-                default:
-                    return -1;
-            }
-
-        default:
-            return -1;
-    }
+    int neighbor_ref_element = (neighbor_coord[0] - e_coord[0] + 1) 
+                             + 3 * (neighbor_coord[1] - e_coord[1] + 1);
+    return local_to_neighbor_dof_map(e_dof, neighbor_ref_element);
 }
 
 void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
