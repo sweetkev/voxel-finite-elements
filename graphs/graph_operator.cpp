@@ -311,8 +311,6 @@ void GraphOperator::RemoveBoundaryDofs(SparseMatrix &B,
             if (interior_dof) { continue; }
 
             // Check if this dof is on the boundary of the domain
-            // A dof is on the boundary if it has a potential neighbor direction
-            // but that neighbor doesn't actually exist in the graph
             Coord e_coord = graph.GetElementCoord(e);
             bool on_boundary = false;
 
@@ -352,10 +350,7 @@ void GraphOperator::RemoveBoundaryDofs(SparseMatrix &B,
                 int broken_dof_index = e * dofs_per_elem + e_dof;
                 int true_dof_index = broken_dof_to_true_dof[broken_dof_index];
                 
-                if (true_dof_index >= 0)
-                {
-                    B.EliminateRow(true_dof_index, dpolicy);
-                }
+                B.EliminateRow(true_dof_index, dpolicy);
             }
         }
     }

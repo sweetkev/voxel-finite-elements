@@ -56,13 +56,12 @@ int main(int argc, char *argv[])
 
     // Create fine graph
     Graph fine_graph(fes, image);
-
+    // Create a GraphOperator for the fine graph to get the broken->true dof map
+    GraphOperator fine_graph_operator(reference_fes, fine_graph);
+    
     // Create coarse graph and its corresponding operator
     Graph coarse_graph = fine_graph.CoarsenGraph();
     GraphOperator coarse_graph_operator(reference_fes, coarse_graph);
-
-    // Create a GraphOperator for the fine graph to get the broken->true dof map
-    GraphOperator fine_graph_operator(reference_fes, fine_graph);
 
     // Create prolongation operator from coarse to fine space
     // Ensure reference element fespace matches the others used
@@ -136,4 +135,78 @@ int main(int argc, char *argv[])
     a.RecoverFEMSolution(X,b,x);
     x.Save("sol.gf");
     mesh.GetMesh().Save("mesh.mesh");
+
+//     // If nlevels was not specified, coarsen until height or width is 2
+//     if(nlevels < 0) {
+//         int width = mesh.GetWidth();
+//         int height = mesh.GetHeight();
+      
+//         // Fnd the number of coarsenings until height or width is 2 (if square, when we have a 2x2 grid)
+//         nlevels = max(ceil(log2(width)),ceil(log2(height)));
+//         cout << "new nlevels: " << to_string(nlevels) << "\n";
+//    }
+
+//     Array<Operator*> operators(nlevels);
+//     Array<Solver*> smoothers(nlevels);
+//     Array<Operator*> prolongations(nlevels - 1);
+//     Array<bool> own_operators(nlevels);
+//     Array<bool> own_smoothers(nlevels);
+//     Array<bool> own_prolongations(nlevels - 1);
+
+//     own_operators = false;
+//     own_smoothers = false;
+//     own_prolongations = false;
+
+//     vector<unique_ptr<Graph>> graphs(nlevels);
+//     vector<unique_ptr<GraphOperator>> graph_operators(nlevels);
+
+//     operators[nlevels-1] = &A;
+
+//     GSSmoother fine_smoother(A);
+//     smoothers[nlevels-1] = &fine_smoother;
+
+//     graphs[nlevels-1] = make_unique<Graph>(fine_graph);
+//     graph_operators[nlevels-1] = make_unique<GraphOperator>(fine_graph_operator);
+//     for (int level = nlevels-2; level >= 0; --level)
+//     {
+//         graphs[level] = make_unique<Graph>(graphs[level+1]->CoarsenGraph());
+//         graph_operators[level] = make_unique<GraphOperator>(reference_fes, *graphs[level]);
+
+//         SparseMatrix *coarse_A = new SparseMatrix(graph_operators[level]->GetMatrix());
+//         operators[level] = coarse_A;
+//         own_operators[level] = true;
+
+//         if (level == 0)
+//         {
+//             smoothers[0] = new UMFPackSolver(*coarse_A);
+//         }
+//         else
+//         {
+//             smoothers[level] = new GSSmoother(*coarse_A);
+//         }
+//         own_smoothers[level] = true;
+
+//         SparseMatrix *P = new SparseMatrix(graph_operators[level]->CreateProlongation(
+//             local_prolongation,
+//             *graphs[level+1],
+//             graph_operators[level+1]->GetBrokenDofToTrueDofMap()));
+//         prolongations[level] = P;
+//         own_prolongations[level] = true;
+//     }
+
+//     Multigrid mg(operators, smoothers, prolongations, own_operators, own_smoothers,
+//                 own_prolongations);
+
+//     //solve problem
+//     CGSolver cg;
+//     cg.SetRelTol(1e-12);
+//     cg.SetMaxIter(2000);
+//     cg.SetPrintLevel(1);
+//     cg.SetOperator(A);
+//     cg.SetPreconditioner(mg);
+//     cg.Mult(B, X);
+
+//     a.RecoverFEMSolution(X,b,x);
+//     x.Save("sol.gf");
+//     mesh.GetMesh().Save("mesh.mesh");
 }
