@@ -46,29 +46,7 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
 {
     int dofs_per_elem = A_ref.Height();
 
-    // The prolongation maps true coarse dofs to true fine dofs.
-    // The true dof count is determined by the broken->true mapping.
-    int fine_true_dofs = 0;
-    for (int v : fine_broken_to_true_dof)
-    {
-        if (v < 0)
-        {
-            MFEM_ABORT("Invalid fine broken->true dof mapping in CreateProlongation.");
-        }
-        fine_true_dofs = std::max(fine_true_dofs, v + 1);
-    }
-
-    int coarse_true_dofs = 0;
-    for (int v : broken_dof_to_true_dof)
-    {
-        if (v < 0)
-        {
-            MFEM_ABORT("Invalid coarse broken->true dof mapping in CreateProlongation.");
-        }
-        coarse_true_dofs = std::max(coarse_true_dofs, v + 1);
-    }
-
-    SparseMatrix P(fine_true_dofs, coarse_true_dofs);
+    SparseMatrix P(fine_broken_to_true_dof.size(), broken_dof_to_true_dof.size());
 
     // Build prolongation in true DOF space using the broken->true mapping.
     for (int i = 0; i < graph.Size(); ++i)
@@ -93,25 +71,22 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                     int fine_base = neighbor_index * dofs_per_elem;
 
                     // Insert into P using true global dof indices.
+                    Array<int> rows(dofs_per_elem);
+                    Array<int> cols(dofs_per_elem);
                     for (int rf = 0; rf < dofs_per_elem; ++rf)
                     {
                         const int fine_tdof = fine_broken_to_true_dof[fine_base + rf];
-                        if (fine_tdof < 0) { continue; }
-                        for (int rc = 0; rc < dofs_per_elem; ++rc)
-                        {
-                            const int coarse_tdof = broken_dof_to_true_dof[coarse_base + rc];
-                            if (coarse_tdof < 0) { continue; }
-
-                            const double val = local_prolongation(j + 2*k)(rf, rc);
-                            if (val != 0.0)
-                            {
-                                P.Add(fine_tdof, coarse_tdof, val);
-                            }
-                        }
+                        rows[rf] = fine_tdof;
                     }
+                    for (int rc = 0; rc < dofs_per_elem; ++rc)
+                    {
+                        const int coarse_tdof = broken_dof_to_true_dof[coarse_base + rc];
+                        cols[rc] = coarse_tdof;
+                    }
+                    P.AddSubMatrix(rows, cols, local_prolongation(j + 2*k));
                 }
             }
-        }    
+        }
     }
 
     // Remove boundary dofs (now correctly implemented in true DOF space)
