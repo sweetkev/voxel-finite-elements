@@ -169,7 +169,8 @@ int main(int argc, char *argv[])
     SparseMatrix *P = new SparseMatrix(coarse_graph_operator.CreateProlongation(
         local_prolongation,
         fine_graph,
-        fine_graph_operator.GetBrokenDofToTrueDofMap()));
+        fine_graph_operator.GetBrokenDofToTrueDofMap(),
+        fine_graph_operator.GetDofGroups()));
     SparseMatrix *coarse_A = new SparseMatrix(coarse_graph_operator.GetMatrix());
 
     // Create multigrid hierarchy

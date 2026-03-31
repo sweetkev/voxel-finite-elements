@@ -23,10 +23,13 @@ public:
     */
     SparseMatrix CreateProlongation(DenseTensor &local_prolongation,
                                     Graph &fine_graph,
-                                    const std::vector<int> &fine_broken_to_true_dof);
+                                    const std::vector<int> &fine_broken_to_true_dof,
+                                    const std::vector<std::set<int>> fine_dof_groups);
 
     /// Returns mapping from broken (element-local) dofs to true global dofs.
     const std::vector<int> &GetBrokenDofToTrueDofMap() const { return broken_dof_to_true_dof; }
+
+    const std::vector<std::set<int>> &GetDofGroups() const { return dof_groups; }
 
 private:
     DenseMatrix A_ref;
@@ -44,6 +47,10 @@ private:
     SparseMatrix A;
     Graph graph;
 
+    // vector with size equal to number of true dofs whose entries contain the 
+    // sets of broken dofs identified with the true dof.
+    std::vector<std::set<int>> dof_groups;
+
     GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_fes_, 
                   Graph &graph_);
 
@@ -60,7 +67,7 @@ private:
     /** Creates the vector with size equal to number of true dofs whose entries
      *  contain the sets of broken dofs identified with the true dof.
     */
-    std::vector<std::set<int>> CreateDofGroups();
+    void CreateDofGroups();
 
     /** Returns the local dof number on neighbor element that corresponds
      *  to the local dof number e_dof on element e. If the dof is not shared

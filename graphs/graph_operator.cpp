@@ -14,7 +14,7 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     CreateDofMap();
 
     // Create dof_groups
-    std::vector<std::set<int>> dof_groups = CreateDofGroups();
+    CreateDofGroups();
 
     // Build A matrix
     BuildA(dof_groups);
@@ -34,7 +34,7 @@ GraphOperator::GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_
     CreateDofMap();
 
     // Create dof_groups
-    std::vector<std::set<int>> dof_groups = CreateDofGroups();
+    CreateDofGroups();
 
     // Build A matrix
     BuildA(dof_groups);
@@ -42,11 +42,14 @@ GraphOperator::GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_
 
 SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                                                Graph &fine_graph,
-                                               const std::vector<int> &fine_broken_to_true_dof)
+                                               const std::vector<int> &fine_broken_to_true_dof,
+                                               const std::vector<std::set<int>> fine_dof_groups)
 {
-    int dofs_per_elem = A_ref.Height();
+    const int dofs_per_elem = A_ref.Height();
+    const int num_coarse_dofs = dof_groups.size();
+    const int num_fine_dofs = fine_dof_groups.size();
 
-    SparseMatrix P(fine_broken_to_true_dof.size(), broken_dof_to_true_dof.size());
+    SparseMatrix P(num_fine_dofs, num_coarse_dofs);
 
     // Build prolongation in true DOF space using the broken->true mapping.
     for (int i = 0; i < graph.Size(); ++i)
@@ -146,7 +149,7 @@ void GraphOperator::CreateDofMap()
     }
 }
 
-std::vector<std::set<int>> GraphOperator::CreateDofGroups()
+void GraphOperator::CreateDofGroups()
 {
     const int dofs_per_elem = A_ref.Height();
     const int ne = graph.Size();
@@ -210,7 +213,6 @@ std::vector<std::set<int>> GraphOperator::CreateDofGroups()
         }
     }
 
-    std::vector<std::set<int>> dof_groups;
     for (int i = 0; i < nd; ++i)
     {
         if (!connected_components[i].empty())
@@ -218,8 +220,6 @@ std::vector<std::set<int>> GraphOperator::CreateDofGroups()
             dof_groups.push_back(connected_components[i]);
         }
     }
-
-    return dof_groups;
 }
 
 int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
