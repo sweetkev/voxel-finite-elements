@@ -26,7 +26,7 @@ OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 
 INCLUDES := $(MFEM_INCFLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
-CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP
+CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP -g
 
 
 all: dirichlet_2d graph_solver
