@@ -34,6 +34,7 @@ public:
 private:
     DenseMatrix A_ref;
     FiniteElementSpace reference_fes;
+    int level;
 
     // Matrix whose (i,j) entry denotes the local dof number on reference
     // element j which is identified with the local dof i on
@@ -51,8 +52,8 @@ private:
     // sets of broken dofs identified with the true dof.
     std::vector<std::set<int>> dof_groups;
 
-    GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_fes_, 
-                  Graph &graph_);
+    GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_fes_, 
+                  Graph &graph_, int level);
 
     /** Builds the matrix A_ref representing the stiffness matrix over the
      *  reference element.

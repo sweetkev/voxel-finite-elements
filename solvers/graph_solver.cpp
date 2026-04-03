@@ -171,6 +171,14 @@ int main(int argc, char *argv[])
         fine_graph,
         fine_graph_operator.GetBrokenDofToTrueDofMap(),
         fine_graph_operator.GetDofGroups()));
+    
+    // PixelMesh coarse_mesh = mesh.CoarsenMesh();
+    // FiniteElementSpace coarse_fes(&coarse_mesh.GetMesh(), &fec);
+    // SparseMatrix *P = new SparseMatrix(
+    // CreatePixelProlongation(coarse_mesh, coarse_fes,
+    //                         mesh, fes,
+    //                         ess_dofs));
+
     SparseMatrix *coarse_A = new SparseMatrix(coarse_graph_operator.GetMatrix());
 
     // Create multigrid hierarchy
@@ -210,5 +218,4 @@ int main(int argc, char *argv[])
     a.RecoverFEMSolution(X,b,x);
     x.Save("sol.gf");
     mesh.GetMesh().Save("mesh.mesh");
-
 }

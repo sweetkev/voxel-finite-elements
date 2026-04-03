@@ -23,13 +23,14 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
 GraphOperator GraphOperator::Coarsen()
 {
     Graph coarse_graph = graph.CoarsenGraph();
-    return GraphOperator(A_ref, reference_fes, coarse_graph);
+    return GraphOperator(A_ref, reference_fes, coarse_graph, level + 1);
 }
 
-GraphOperator::GraphOperator(DenseMatrix &A_ref_, FiniteElementSpace &reference_fes_, 
-                  Graph &graph_)
-    : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_)
+GraphOperator::GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_fes_, 
+                  Graph &graph_, int level_)
+    : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_), level(level_)
 {
+    A_ref.Set(1 / pow(pow(2, level), reference_fes.GetFE(0)->GetDim()), A_ref);
     // Create map from local dof # to neighboring cells with dof
     CreateDofMap();
 
