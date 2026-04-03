@@ -7,6 +7,7 @@ using namespace mfem;
 GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     : reference_fes(reference_fes_), graph(graph_)
 {
+    level = 0;
     // Build A_ref
     BuildARef();
 
@@ -30,7 +31,7 @@ GraphOperator::GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_f
                   Graph &graph_, int level_)
     : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_), level(level_)
 {
-    A_ref.Set(1 / pow(pow(2, level), reference_fes.GetFE(0)->GetDim()), A_ref);
+    A_ref *= 1 / pow(pow(2, level), reference_fes.GetFE(0)->GetDim());
     // Create map from local dof # to neighboring cells with dof
     CreateDofMap();
 
