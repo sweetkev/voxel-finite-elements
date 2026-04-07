@@ -7,7 +7,6 @@ using namespace mfem;
 GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     : reference_fes(reference_fes_), graph(graph_)
 {
-    level = 0;
     // Build A_ref
     BuildARef();
 
@@ -24,14 +23,13 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
 GraphOperator GraphOperator::Coarsen()
 {
     Graph coarse_graph = graph.CoarsenGraph();
-    return GraphOperator(A_ref, reference_fes, coarse_graph, level + 1);
+    return GraphOperator(A_ref, reference_fes, coarse_graph);
 }
 
 GraphOperator::GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_fes_, 
-                  Graph &graph_, int level_)
-    : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_), level(level_)
+                  Graph &graph_)
+    : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_)
 {
-    A_ref *= 1 / pow(pow(2, level), reference_fes.GetFE(0)->GetDim());
     // Create map from local dof # to neighboring cells with dof
     CreateDofMap();
 
