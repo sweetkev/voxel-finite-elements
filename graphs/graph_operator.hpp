@@ -13,7 +13,7 @@ class GraphOperator
 public:
     GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_);
 
-    // Builds the coarse graph operator by coarsening the fine graph operator.
+    // Returns the GraphOperator corresponding the the next coarsened level of the graph/fes.
     GraphOperator Coarsen();
 
     SparseMatrix &GetMatrix() { return A; }
@@ -26,8 +26,7 @@ public:
                                     const std::vector<int> &fine_broken_to_true_dof,
                                     const std::vector<std::set<int>> fine_dof_groups);
 
-    /// Returns mapping from broken (element-local) dofs to true global dofs.
-    const std::vector<int> &GetBrokenDofToTrueDofMap() const { return broken_dof_to_true_dof; }
+    const std::vector<int> &GetBrokenToTrueDofMap() const { return broken_to_true_dof; }
 
     const std::vector<std::set<int>> &GetDofGroups() const { return dof_groups; }
 
@@ -38,16 +37,18 @@ private:
     // Matrix whose (i,j) entry denotes the local dof number on reference
     // element j which is identified with the local dof i on
     // the central reference element.
+    // Is there a way to do this with a table instead of a DenseMatrix? Or
+    // would a SparseMatrix be more appropriate?
     DenseMatrix local_to_neighbor_dof_map;
 
-    // Maps each broken (element-local) dof index to the global true-dof index.
-    // Size is (#elements * dofs_per_element).
-    std::vector<int> broken_dof_to_true_dof;
+    // Maps each broken dof index to the true dof index.
+    // Size is (ne * dofs_per_element).
+    std::vector<int> broken_to_true_dof;
 
     SparseMatrix A;
     Graph graph;
 
-    // vector with size equal to number of true dofs whose entries contain the 
+    // Vector with size equal to number of true dofs whose entries contain the 
     // sets of broken dofs identified with the true dof.
     std::vector<std::set<int>> dof_groups;
 
@@ -62,7 +63,7 @@ private:
     /** Creates the table whose ith row represents a local dof number
      *  and jth column represents a reference cell in the reference mesh
      */
-    void CreateDofMap();
+    void CreateReferenceDofMap();
 
     /** Creates the vector with size equal to number of true dofs whose entries
      *  contain the sets of broken dofs identified with the true dof.
@@ -77,8 +78,8 @@ private:
 
     /** Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
      *  hat{A} is the block diagonal matrix with blocks corresponding to the 
-     *  local element matrix A_ref, and Lambda is the boolean matrix mapping the
-     *  broken dofs to the global dofs.
+     *  local element matrix A_ref, and Lambda is the boolean matrix mapping
+     *  broken dofs to the true dofs.
      */
     void BuildA(std::vector<std::set<int>> dof_groups);
 

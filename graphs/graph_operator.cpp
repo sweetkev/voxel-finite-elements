@@ -10,14 +10,16 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
     // Build A_ref
     BuildARef();
 
-    // Create map from local dof # to neighboring cells with dof
-    CreateDofMap();
+    // Create map from local dof number on central reference element to
+    // the local dof number on neigboring reference element
+    CreateReferenceDofMap();
 
-    // Create dof_groups
+    // Create dof_groups and map from broken dofs to true dofs
     CreateDofGroups();
 
+    // We do not need to build A on the finest level
     // Build A matrix
-    BuildA(dof_groups);
+    // BuildA(dof_groups);
 }
 
 GraphOperator GraphOperator::Coarsen()
@@ -30,8 +32,13 @@ GraphOperator::GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_f
                   Graph &graph_)
     : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_)
 {
+    // Scale A_ref by 2^(d-2), which follows from the coarsening by a factor of
+    // h = 2
+    const int d = reference_fes.GetMesh()->Dimension();
+    A_ref *= pow(2, d-2);
+
     // Create map from local dof # to neighboring cells with dof
-    CreateDofMap();
+    CreateReferenceDofMap();
 
     // Create dof_groups
     CreateDofGroups();
@@ -83,7 +90,7 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                     }
                     for (int rc = 0; rc < dofs_per_elem; ++rc)
                     {
-                        const int coarse_tdof = broken_dof_to_true_dof[coarse_base + rc];
+                        const int coarse_tdof = broken_to_true_dof[coarse_base + rc];
                         cols[rc] = coarse_tdof;
                     }
                     P.AddSubMatrix(rows, cols, local_prolongation(j + 2*k));
@@ -92,8 +99,8 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
         }
     }
 
-    // Remove boundary dofs (now correctly implemented in true DOF space)
-    RemoveBoundaryDofs(P, Operator::DIAG_ZERO);
+    // Remove boundary dofs
+    // RemoveBoundaryDofs(P, Operator::DIAG_ZERO);
 
     P.Finalize();
 
@@ -110,7 +117,10 @@ void GraphOperator::BuildARef()
     SparseMatrix large_A = a.SpMat();
 
     Array<int> ref_dofs;
-    reference_fes.GetElementDofs(4, ref_dofs);
+    // Get dofs for the central reference element (given by (3^d - 1)/2, where 
+    // d is the mesh dimension).
+    int e = (pow(3, reference_fes.GetMesh()->Dimension()) - 1) / 2;
+    reference_fes.GetElementDofs(e, ref_dofs);
     
     const int dofs_per_elem = ref_dofs.Size();
     A_ref.SetSize(dofs_per_elem, dofs_per_elem);
@@ -118,25 +128,29 @@ void GraphOperator::BuildARef()
     large_A.GetSubMatrix(ref_dofs, ref_dofs, A_ref);
 }
 
-void GraphOperator::CreateDofMap()
+void GraphOperator::CreateReferenceDofMap()
 {
     const int dofs_per_elem = A_ref.Height();
+    const int d = reference_fes.GetMesh()->Dimension();
 
-    local_to_neighbor_dof_map.SetSize(dofs_per_elem, 9);
+    local_to_neighbor_dof_map.SetSize(dofs_per_elem, pow(3,d));
     local_to_neighbor_dof_map = -1;
 
-    // For each DoF of reference element, find the neighboring elements who
-    // share the Dof
     Array<int> ref_dofs;
-    reference_fes.GetElementDofs(4, ref_dofs);
+    int central_element = 0.5 * (pow(3,d)-1);
+    reference_fes.GetElementDofs(central_element, ref_dofs);
+
+    // For each local dof of reference element, find the neighboring elements 
+    // who share the dof, and list the corresponding local dof number on 
+    // neighbor.
     for (int i = 0; i < dofs_per_elem; ++i)
     {
         int dof = ref_dofs[i];
-        for (int e = 0; e < 9; ++e)
+        for (int e = 0; e < pow(3,d); ++e)
         {
-            if (e == 4) { continue; }
+            if (e == central_element) { continue; }
             Array<int> neighbor_dofs;
-            reference_fes.GetElementDofs(e,neighbor_dofs);
+            reference_fes.GetElementDofs(e, neighbor_dofs);
             for (int j = 0; j < neighbor_dofs.Size(); ++j)
             {
                 if (neighbor_dofs[j] == dof)
@@ -153,20 +167,20 @@ void GraphOperator::CreateDofGroups()
 {
     const int dofs_per_elem = A_ref.Height();
     const int ne = graph.Size();
-    const int nd = dofs_per_elem * ne;
+    const int nbdofs = dofs_per_elem * ne;
     Array<int> dof_labeling;
 
-    std::vector<int> element_component_index(nd);
-    std::vector<std::set<int>> connected_components(nd);
+    std::vector<int> element_component_index(nbdofs);
+    std::vector<std::set<int>> connected_components(nbdofs);
 
     // Initialize E_i = { i } and component index
-    for (int i = 0; i < nd; ++i)
+    for (int i = 0; i < nbdofs; ++i)
     {
         connected_components[i].emplace(i);
         element_component_index[i] = i;
     }
 
-    // merges connected component j into connected component i
+    // Method to merge connected component j into connected component i
     auto merge = [&](int i, int j)
     {
         const int ci = element_component_index[i];
@@ -179,23 +193,9 @@ void GraphOperator::CreateDofGroups()
     {
         for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
         {
-            // Skip if interior dof
-            bool interior_dof = true;
-            for (int j = 0; j < 9; ++j)
-            {
-                if (local_to_neighbor_dof_map(e_dof,j) != -1)
-                {
-                    interior_dof = false;
-                }
-            }
-            if (interior_dof) { continue; }
-
-            // For each connected element, check if the dof is shared between
-            // them.
             Array<int> connected_elements = graph.GetConnectedNodes(e);
-            for (int j = 0; j < connected_elements.Size(); ++j)
+            for (int neighbor : connected_elements)
             {
-                int neighbor = connected_elements[j];
                 int neighbor_dof = GetNeighborDof(e, e_dof, neighbor);
                 if (neighbor_dof != -1)
                 {
@@ -213,11 +213,23 @@ void GraphOperator::CreateDofGroups()
         }
     }
 
-    for (int i = 0; i < nd; ++i)
+    for (int i = 0; i < nbdofs; ++i)
     {
         if (!connected_components[i].empty())
         {
             dof_groups.push_back(connected_components[i]);
+        }
+    }
+
+    // Build map from broken dof number to true dof number
+    broken_to_true_dof.assign(nbdofs, -1);
+    const int ntdofs = dof_groups.size();
+    for (int tdof = 0; tdof < ntdofs; ++tdof)
+    {
+        const std::set<int> &dof_group = dof_groups[tdof];
+        for (int broken_dof : dof_group)
+        {
+            broken_to_true_dof[broken_dof] = tdof;
         }
     }
 }
@@ -227,8 +239,12 @@ int GraphOperator::GetNeighborDof(int e, int e_dof, int neighbor)
     Coord e_coord = graph.GetElementCoord(e);
     Coord neighbor_coord = graph.GetElementCoord(neighbor);
 
-    int neighbor_ref_element = (neighbor_coord[0] - e_coord[0] + 1) 
-                             + 3 * (neighbor_coord[1] - e_coord[1] + 1);
+    int d = reference_fes.GetMesh()->Dimension();
+    int neighbor_ref_element = 0;
+    for (int i = 0; i < d; ++i)
+    {
+        neighbor_ref_element += (neighbor_coord[i] - e_coord[i] + 1) * pow(3, i);
+    }
     return local_to_neighbor_dof_map(e_dof, neighbor_ref_element);
 }
 
@@ -236,35 +252,27 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 {
     // This method feels very unoptimized. The matrices are very sparse and
     // have a lot of structure, which could be explioted. However, this should
-    // work, and was the most direct way I could see using MFEM's existing
-    // methods.
+    // work, and was the most direct way I could see using MFEM's methods.
 
     // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
-    // true global dof j, and 0 otherwise.
+    // true dof j, and 0 otherwise.
     
     const int dofs_per_elem = A_ref.Height();
     const int ne = graph.Size();
-    const int total_dofs = dofs_per_elem * ne;
-
-    // Map from broken dof to global dof (true dof numbering)
-    broken_dof_to_true_dof.assign(total_dofs, -1);
-
-    SparseMatrix Lambda(total_dofs, dof_groups.size());
-    for (int global_dof = 0; global_dof < dof_groups.size(); ++global_dof)
+    const int nbdofs = dofs_per_elem * ne;
+    const int ntdofs = dof_groups.size();
+    
+    SparseMatrix Lambda(nbdofs, ntdofs);
+    for (int bdof = 0; bdof < nbdofs; ++bdof) 
     {
-        const std::set<int> &group = dof_groups[global_dof];
-        for (int broken_dof : group)
-        {
-            Lambda.Add(broken_dof, global_dof, 1.0);
-            broken_dof_to_true_dof[broken_dof] = global_dof;
-        }
+        int tdof = broken_to_true_dof[bdof];
+        Lambda.Set(bdof, tdof, 1.0);
     }
 
-    // Build hat{A} matrix. (This feels like a very silly way of doing this,
-    // but it should work)
-    SparseMatrix A_hat(total_dofs, total_dofs);
+    // Build hat{A} matrix.
+    SparseMatrix A_hat(nbdofs, nbdofs);
     
-    for (int e = 0; e < graph.Size(); ++e)
+    for (int e = 0; e < ne; ++e)
     {
         Array<int> block_indices(dofs_per_elem);
         for (int i = 0; i < dofs_per_elem; ++i)
@@ -276,85 +284,87 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 
     // Finalize matrices before RAP operation
     Lambda.Finalize();
+    Lambda.Print();
     A_hat.Finalize();
 
     // Compute A = Lambda^T * hat{A} * Lambda
     A = *RAP(Lambda, A_hat, Lambda);
+    A.Finalize();
 
     // Eliminate boundary dofs from coarse operator
-    RemoveBoundaryDofs(A, Operator::DIAG_ONE);
+    // RemoveBoundaryDofs(A, Operator::DIAG_ONE);
 }
 
-void GraphOperator::RemoveBoundaryDofs(SparseMatrix &B, 
-                                       Operator::DiagonalPolicy dpolicy)
-{ 
-    const int dofs_per_elem = A_ref.Height();
-    const int ne = graph.Size();
+// void GraphOperator::RemoveBoundaryDofs(SparseMatrix &B, 
+//                                        Operator::DiagonalPolicy dpolicy)
+// { 
+//     const int dofs_per_elem = A_ref.Height();
+//     const int ne = graph.Size();
 
-    // Identify and eliminate boundary dofs
-    for (int e = 0; e < ne; ++e)
-    {
-        Array<int> connected_elements = graph.GetConnectedNodes(e);
+//     // Identify and eliminate boundary dofs
+//     for (int e = 0; e < ne; ++e)
+//     {
+//         Array<int> connected_elements = graph.GetConnectedNodes(e);
         
-        for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
-        {
-            // Skip if interior dof
-            bool interior_dof = true;
-            for (int j = 0; j < 9; ++j)
-            {
-                if (local_to_neighbor_dof_map(e_dof, j) != -1)
-                {
-                    interior_dof = false;
-                    break;
-                }
-            }
-            if (interior_dof) { continue; }
+//         for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
+//         {
+//             // Skip if interior dof
+//             bool interior_dof = true;
+//             for (int j = 0; j < 9; ++j)
+//             {
+//                 if (local_to_neighbor_dof_map(e_dof, j) != -1)
+//                 {
+//                     interior_dof = false;
+//                     break;
+//                 }
+//             }
+//             if (interior_dof) { continue; }
 
-            // Check if this dof is on the boundary of the domain
-            Coord e_coord = graph.GetElementCoord(e);
-            bool on_boundary = false;
+//             // Check if this dof is on the boundary of the domain
+//             Coord e_coord = graph.GetElementCoord(e);
+//             bool on_boundary = false;
 
-            // Check all 8 potential neighbor directions (skip center element 4)
-            for (int neighbor_dir = 0; neighbor_dir < 9; ++neighbor_dir)
-            {
-                if (neighbor_dir == 4) continue;
+//             // Check all 8 potential neighbor directions (skip center element 4)
+//             for (int neighbor_dir = 0; neighbor_dir < 9; ++neighbor_dir)
+//             {
+//                 if (neighbor_dir == 4) continue;
                 
-                if (local_to_neighbor_dof_map(e_dof, neighbor_dir) != -1)
-                {
-                    // Convert direction index to coordinate offset
-                    int dx = (neighbor_dir % 3) - 1;  // -1, 0, or 1
-                    int dy = (neighbor_dir / 3) - 1;  // -1, 0, or 1
-                    Coord neighbor_coord(e_coord[0] + dx, e_coord[1] + dy);
+//                 if (local_to_neighbor_dof_map(e_dof, neighbor_dir) != -1)
+//                 {
+//                     // Convert direction index to coordinate offset
+//                     int dx = (neighbor_dir % 3) - 1;  // -1, 0, or 1
+//                     int dy = (neighbor_dir / 3) - 1;  // -1, 0, or 1
+//                     Coord neighbor_coord(e_coord[0] + dx, e_coord[1] + dy);
 
-                    // Check if this neighbor exists in the graph
-                    bool neighbor_exists = false;
-                    for (int neighbor : connected_elements)
-                    {
-                        if (graph.GetElementCoord(neighbor) == neighbor_coord)
-                        {
-                            neighbor_exists = true;
-                            break;
-                        }
-                    }
+//                     // Check if this neighbor exists in the graph
+//                     bool neighbor_exists = false;
+//                     for (int neighbor : connected_elements)
+//                     {
+//                         if (graph.GetElementCoord(neighbor) == neighbor_coord)
+//                         {
+//                             neighbor_exists = true;
+//                             break;
+//                         }
+//                     }
 
-                    if (!neighbor_exists)
-                    {
-                        on_boundary = true;
-                        break;
-                    }
-                }
-            }
+//                     if (!neighbor_exists)
+//                     {
+//                         on_boundary = true;
+//                         break;
+//                     }
+//                 }
+//             }
 
-            if (on_boundary)
-            {
-                int broken_dof_index = e * dofs_per_elem + e_dof;
-                int true_dof_index = broken_dof_to_true_dof[broken_dof_index];
+//             if (on_boundary)
+//             {
+//                 int broken_dof_index = e * dofs_per_elem + e_dof;
+//                 int true_dof_index = broken_dof_to_true_dof[broken_dof_index];
                 
-                B.EliminateRow(true_dof_index, dpolicy);
-            }
-        }
-    }
-}
+//                 B.EliminateRow(true_dof_index, dpolicy);
+//             }
+//         }
+//     }
+// }
 
 Mesh CreateReferenceMesh(int dim)
 {

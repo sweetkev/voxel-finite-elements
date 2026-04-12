@@ -1,6 +1,6 @@
 f = open("square.pgm"; write=true)
 
-n = 64
+n = 4
 
 println(f, "P2")
 println(f, n, " ", n)
