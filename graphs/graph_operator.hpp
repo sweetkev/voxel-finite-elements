@@ -82,11 +82,6 @@ private:
      *  broken dofs to the true dofs.
      */
     void BuildA(std::vector<std::set<int>> dof_groups);
-
-    // Removes boundary dofs from the sparsematrix B
-    void RemoveBoundaryDofs(SparseMatrix &B, 
-                            Operator::DiagonalPolicy dpolicy);
-
 };
 
 /** Builds mesh which contains all neighbor information for a single element.

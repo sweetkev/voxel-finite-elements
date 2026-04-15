@@ -99,8 +99,7 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
         }
     }
 
-    // Remove boundary dofs
-    // RemoveBoundaryDofs(P, Operator::DIAG_ZERO);
+    // TODO: Handle boundary dofs in P
 
     P.Finalize();
 
@@ -291,80 +290,8 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
     A = *RAP(Lambda, A_hat, Lambda);
     A.Finalize();
 
-    // Eliminate boundary dofs from coarse operator
-    // RemoveBoundaryDofs(A, Operator::DIAG_ONE);
+    // TODO: Eliminate boundary dofs from coarse operator
 }
-
-// void GraphOperator::RemoveBoundaryDofs(SparseMatrix &B, 
-//                                        Operator::DiagonalPolicy dpolicy)
-// { 
-//     const int dofs_per_elem = A_ref.Height();
-//     const int ne = graph.Size();
-
-//     // Identify and eliminate boundary dofs
-//     for (int e = 0; e < ne; ++e)
-//     {
-//         Array<int> connected_elements = graph.GetConnectedNodes(e);
-        
-//         for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
-//         {
-//             // Skip if interior dof
-//             bool interior_dof = true;
-//             for (int j = 0; j < 9; ++j)
-//             {
-//                 if (local_to_neighbor_dof_map(e_dof, j) != -1)
-//                 {
-//                     interior_dof = false;
-//                     break;
-//                 }
-//             }
-//             if (interior_dof) { continue; }
-
-//             // Check if this dof is on the boundary of the domain
-//             Coord e_coord = graph.GetElementCoord(e);
-//             bool on_boundary = false;
-
-//             // Check all 8 potential neighbor directions (skip center element 4)
-//             for (int neighbor_dir = 0; neighbor_dir < 9; ++neighbor_dir)
-//             {
-//                 if (neighbor_dir == 4) continue;
-                
-//                 if (local_to_neighbor_dof_map(e_dof, neighbor_dir) != -1)
-//                 {
-//                     // Convert direction index to coordinate offset
-//                     int dx = (neighbor_dir % 3) - 1;  // -1, 0, or 1
-//                     int dy = (neighbor_dir / 3) - 1;  // -1, 0, or 1
-//                     Coord neighbor_coord(e_coord[0] + dx, e_coord[1] + dy);
-
-//                     // Check if this neighbor exists in the graph
-//                     bool neighbor_exists = false;
-//                     for (int neighbor : connected_elements)
-//                     {
-//                         if (graph.GetElementCoord(neighbor) == neighbor_coord)
-//                         {
-//                             neighbor_exists = true;
-//                             break;
-//                         }
-//                     }
-
-//                     if (!neighbor_exists)
-//                     {
-//                         on_boundary = true;
-//                         break;
-//                     }
-//                 }
-//             }
-
-//             if (on_boundary)
-//             {
-//                 int broken_dof_index = e * dofs_per_elem + e_dof;
-//                 int true_dof_index = broken_dof_to_true_dof[broken_dof_index];
-                
-//                 B.EliminateRow(true_dof_index, dpolicy);
-//             }
-//         }
-//     }
-// }
 
 Mesh CreateReferenceMesh(int dim)
 {
