@@ -4,8 +4,9 @@
 
 using namespace mfem;
 
-GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
-    : reference_fes(reference_fes_), graph(graph_)
+GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_,
+                             real_t h_)
+    : h(h_), reference_fes(reference_fes_), graph(graph_)
 {
     // Build A_ref
     BuildARef();
@@ -19,32 +20,13 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_)
 
     // We do not need to build A on the finest level
     // Build A matrix
-    // BuildA(dof_groups);
+    BuildA(dof_groups);
 }
 
 GraphOperator GraphOperator::Coarsen()
 {
     Graph coarse_graph = graph.CoarsenGraph();
-    return GraphOperator(A_ref, reference_fes, coarse_graph);
-}
-
-GraphOperator::GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_fes_, 
-                  Graph &graph_)
-    : A_ref(A_ref_), reference_fes(reference_fes_), graph(graph_)
-{
-    // Scale A_ref by 2^(d-2), which follows from the coarsening by a factor of
-    // h = 2
-    const int d = reference_fes.GetMesh()->Dimension();
-    A_ref *= pow(2, d-2);
-
-    // Create map from local dof # to neighboring cells with dof
-    CreateReferenceDofMap();
-
-    // Create dof_groups
-    CreateDofGroups();
-
-    // Build A matrix
-    BuildA(dof_groups);
+    return GraphOperator(reference_fes, coarse_graph, h * 2.0);
 }
 
 SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
@@ -70,9 +52,9 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
             {
                 Coord fine_coord(2 * e_coord[0] + j, 2 * e_coord[1] + k);
                 const std::vector<Coord> &fine_grid_cells = fine_graph.GetGridCells();
-                auto it = std::find(fine_grid_cells.begin(), fine_grid_cells.end(), 
+                auto it = std::find(fine_grid_cells.begin(), fine_grid_cells.end(),
                                     fine_coord);
-            
+
                 if (it != fine_grid_cells.end())
                 {
                     int neighbor_index = std::distance(fine_grid_cells.begin(), it);
@@ -108,23 +90,20 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
 
 void GraphOperator::BuildARef()
 {
-    Array<int> *ess_dofs = new Array<int>;
-    reference_fes.GetBoundaryTrueDofs(*ess_dofs);
-    BilinearForm a(&reference_fes);
-    a.AddDomainIntegrator(new DiffusionIntegrator);
-    a.Assemble();
-    SparseMatrix large_A = a.SpMat();
+    DiffusionIntegrator integ1;
+    MassIntegrator integ2;
 
-    Array<int> ref_dofs;
-    // Get dofs for the central reference element (given by (3^d - 1)/2, where 
-    // d is the mesh dimension).
-    int e = (pow(3, reference_fes.GetMesh()->Dimension()) - 1) / 2;
-    reference_fes.GetElementDofs(e, ref_dofs);
-    
-    const int dofs_per_elem = ref_dofs.Size();
-    A_ref.SetSize(dofs_per_elem, dofs_per_elem);
-    
-    large_A.GetSubMatrix(ref_dofs, ref_dofs, A_ref);
+    IsoparametricTransformation T;
+    T.SetIdentityTransformation(reference_fes.GetMesh()->GetTypicalElementGeometry());
+
+    auto &PM = T.GetPointMat();
+    PM *= h;
+
+    integ1.AssembleElementMatrix(*reference_fes.GetTypicalFE(), T, A_ref);
+
+    DenseMatrix A_ref_2;
+    integ2.AssembleElementMatrix(*reference_fes.GetTypicalFE(), T, A_ref_2);
+    A_ref += A_ref_2;
 }
 
 void GraphOperator::CreateReferenceDofMap()
@@ -139,8 +118,8 @@ void GraphOperator::CreateReferenceDofMap()
     int central_element = 0.5 * (pow(3,d)-1);
     reference_fes.GetElementDofs(central_element, ref_dofs);
 
-    // For each local dof of reference element, find the neighboring elements 
-    // who share the dof, and list the corresponding local dof number on 
+    // For each local dof of reference element, find the neighboring elements
+    // who share the dof, and list the corresponding local dof number on
     // neighbor.
     for (int i = 0; i < dofs_per_elem; ++i)
     {
@@ -199,7 +178,7 @@ void GraphOperator::CreateDofGroups()
                 if (neighbor_dof != -1)
                 {
                     int e_index = dofs_per_elem * e + e_dof;
-                    int neighbor_index = dofs_per_elem * neighbor 
+                    int neighbor_index = dofs_per_elem * neighbor
                                          + neighbor_dof;
                     int ci = element_component_index[e_index];
                     int cj = element_component_index[neighbor_index];
@@ -255,14 +234,14 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 
     // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
     // true dof j, and 0 otherwise.
-    
+
     const int dofs_per_elem = A_ref.Height();
     const int ne = graph.Size();
     const int nbdofs = dofs_per_elem * ne;
     const int ntdofs = dof_groups.size();
-    
+
     SparseMatrix Lambda(nbdofs, ntdofs);
-    for (int bdof = 0; bdof < nbdofs; ++bdof) 
+    for (int bdof = 0; bdof < nbdofs; ++bdof)
     {
         int tdof = broken_to_true_dof[bdof];
         Lambda.Set(bdof, tdof, 1.0);
@@ -270,7 +249,7 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 
     // Build hat{A} matrix.
     SparseMatrix A_hat(nbdofs, nbdofs);
-    
+
     for (int e = 0; e < ne; ++e)
     {
         Array<int> block_indices(dofs_per_elem);
@@ -286,6 +265,11 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
     Lambda.Print();
     A_hat.Finalize();
 
+    {
+        std::ofstream f("A_hat.txt");
+        A_hat.PrintMatlab(f);
+    }
+
     // Compute A = Lambda^T * hat{A} * Lambda
     A = *RAP(Lambda, A_hat, Lambda);
     A.Finalize();
@@ -297,12 +281,12 @@ Mesh CreateReferenceMesh(int dim)
 {
     if (dim == 2)
     {
-        return Mesh::MakeCartesian2D(3, 3, Element::QUADRILATERAL, false, 
+        return Mesh::MakeCartesian2D(3, 3, Element::QUADRILATERAL, false,
                                      1.0, 1.0, false);
     }
     else if (dim == 3)
     {
-        return Mesh::MakeCartesian3D(3, 3, 3, Element::HEXAHEDRON, 
+        return Mesh::MakeCartesian3D(3, 3, 3, Element::HEXAHEDRON,
                                      1.0, 1.0, 1.0, false);
     }
     else

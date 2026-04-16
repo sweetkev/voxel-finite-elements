@@ -30,10 +30,11 @@ int main(int argc, char *argv[])
     FiniteElementSpace fes(&mesh.GetMesh(), &fec);
 
     Array<int> ess_dofs;
-    fes.GetBoundaryTrueDofs(ess_dofs);
+    // fes.GetBoundaryTrueDofs(ess_dofs);
 
     BilinearForm a(&fes);
     a.AddDomainIntegrator(new DiffusionIntegrator);
+    a.AddDomainIntegrator(new MassIntegrator);
     a.Assemble();
 
     GridFunction x(&fes);
@@ -57,12 +58,23 @@ int main(int argc, char *argv[])
     // Create fine graph
     Graph fine_graph(fes, image);
 
+    const real_t h = mesh.GetMesh().GetElementSize(0, 0);
+
     // Create a GraphOperator for the fine graph to get the broken->true dof map
-    GraphOperator fine_graph_operator(reference_fes, fine_graph);
+    GraphOperator fine_graph_operator(reference_fes, fine_graph, h);
 
     // Create coarse graph and its corresponding operator
     GraphOperator coarse_graph_operator = fine_graph_operator.Coarsen();
     SparseMatrix *coarse_A = new SparseMatrix(coarse_graph_operator.GetMatrix());
+
+    {
+        std::ofstream f("A.txt");
+        A.PrintMatlab(f);
+    }
+    {
+        std::ofstream f("coarse_A.txt");
+        coarse_A->PrintMatlab(f);
+    }
 
     // Create prolongation operator from coarse to fine space
     // Ensure reference element fespace matches the others used
@@ -99,6 +111,10 @@ int main(int argc, char *argv[])
         fine_graph_operator.GetBrokenToTrueDofMap(),
         fine_graph_operator.GetDofGroups()));
 
+    {
+        std::ofstream f("P.txt");
+        P->PrintMatlab(f);
+    }
 
     // Create multigrid hierarchy
     Array<Operator*> operators(2);
@@ -122,7 +138,7 @@ int main(int argc, char *argv[])
     own_prolongations = true;
 
 
-    Multigrid mg(operators, smoothers, prolongations, own_operators, 
+    Multigrid mg(operators, smoothers, prolongations, own_operators,
                  own_smoothers, own_prolongations);
 
     //solve problem

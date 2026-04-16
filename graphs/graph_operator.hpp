@@ -11,14 +11,14 @@ using namespace mfem;
 class GraphOperator
 {
 public:
-    GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_);
+    GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_, real_t h_);
 
     // Returns the GraphOperator corresponding the the next coarsened level of the graph/fes.
     GraphOperator Coarsen();
 
     SparseMatrix &GetMatrix() { return A; }
 
-    /** Builds prolongartion matrix from coarse space to fine space using the 
+    /** Builds prolongartion matrix from coarse space to fine space using the
     *   local prolongation defined on the reference element.
     */
     SparseMatrix CreateProlongation(DenseTensor &local_prolongation,
@@ -31,6 +31,8 @@ public:
     const std::vector<std::set<int>> &GetDofGroups() const { return dof_groups; }
 
 private:
+    real_t h;
+
     DenseMatrix A_ref;
     FiniteElementSpace reference_fes;
 
@@ -48,12 +50,9 @@ private:
     SparseMatrix A;
     Graph graph;
 
-    // Vector with size equal to number of true dofs whose entries contain the 
+    // Vector with size equal to number of true dofs whose entries contain the
     // sets of broken dofs identified with the true dof.
     std::vector<std::set<int>> dof_groups;
-
-    GraphOperator(DenseMatrix A_ref_, FiniteElementSpace &reference_fes_, 
-                  Graph &graph_);
 
     /** Builds the matrix A_ref representing the stiffness matrix over the
      *  reference element.
@@ -77,7 +76,7 @@ private:
     int GetNeighborDof(int e, int e_dof, int neighbor);
 
     /** Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
-     *  hat{A} is the block diagonal matrix with blocks corresponding to the 
+     *  hat{A} is the block diagonal matrix with blocks corresponding to the
      *  local element matrix A_ref, and Lambda is the boolean matrix mapping
      *  broken dofs to the true dofs.
      */
