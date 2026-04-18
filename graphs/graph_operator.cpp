@@ -18,7 +18,6 @@ GraphOperator::GraphOperator(FiniteElementSpace &reference_fes_, Graph &graph_,
     // Create dof_groups and map from broken dofs to true dofs
     CreateDofGroups();
 
-    // We do not need to build A on the finest level
     // Build A matrix
     BuildA(dof_groups);
 }
@@ -40,42 +39,37 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
 
     SparseMatrix P(num_fine_dofs, num_coarse_dofs);
 
-    // Build prolongation in true DOF space using the broken->true mapping.
-    for (int i = 0; i < graph.Size(); ++i)
+    for (int coarse_e = 0; coarse_e < graph.Size(); ++coarse_e)
     {
         // TODO: Generalize to n-dimensions
         // Currently assumes 2D
-        Coord e_coord = graph.GetElementCoord(i);
+        Coord coarse_coord = graph.GetElementCoord(coarse_e);
         for (int j = 0; j < 2; ++j)
         {
             for (int k = 0; k < 2; ++k)
             {
-                Coord fine_coord(2 * e_coord[0] + j, 2 * e_coord[1] + k);
-                const std::vector<Coord> &fine_grid_cells = fine_graph.GetGridCells();
-                auto it = std::find(fine_grid_cells.begin(), fine_grid_cells.end(),
-                                    fine_coord);
+                Coord fine_coord(2 * coarse_coord[0] + j, 2 * coarse_coord[1] + k);
+                std::vector<int> fine_coord_elements = fine_graph.GetCoordElements(fine_coord);
 
-                if (it != fine_grid_cells.end())
+                if (!fine_coord_elements.empty())
                 {
-                    int neighbor_index = std::distance(fine_grid_cells.begin(), it);
-
-                    int coarse_base = i * dofs_per_elem;
-                    int fine_base = neighbor_index * dofs_per_elem;
-
-                    // Insert into P using true global dof indices.
-                    Array<int> rows(dofs_per_elem);
-                    Array<int> cols(dofs_per_elem);
-                    for (int rf = 0; rf < dofs_per_elem; ++rf)
+                    for (int fine_e : fine_coord_elements)
                     {
-                        const int fine_tdof = fine_broken_to_true_dof[fine_base + rf];
-                        rows[rf] = fine_tdof;
+                        // Insert values into P using true global dof indices.
+                        Array<int> rows(dofs_per_elem);
+                        Array<int> cols(dofs_per_elem);
+                        for (int rf = 0; rf < dofs_per_elem; ++rf)
+                        {
+                            const int fine_tdof = fine_broken_to_true_dof[fine_e * dofs_per_elem + rf];
+                            rows[rf] = fine_tdof;
+                        }
+                        for (int rc = 0; rc < dofs_per_elem; ++rc)
+                        {
+                            const int coarse_tdof = broken_to_true_dof[coarse_e * dofs_per_elem + rc];
+                            cols[rc] = coarse_tdof;
+                        }
+                        P.SetSubMatrix(rows, cols, local_prolongation(j + 2*k));
                     }
-                    for (int rc = 0; rc < dofs_per_elem; ++rc)
-                    {
-                        const int coarse_tdof = broken_to_true_dof[coarse_base + rc];
-                        cols[rc] = coarse_tdof;
-                    }
-                    P.AddSubMatrix(rows, cols, local_prolongation(j + 2*k));
                 }
             }
         }
@@ -262,7 +256,6 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
 
     // Finalize matrices before RAP operation
     Lambda.Finalize();
-    Lambda.Print();
     A_hat.Finalize();
 
     {

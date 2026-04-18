@@ -22,6 +22,9 @@ public:
     /** Returns the array of nodes connected to current node */
     const Array<int> GetConnectedNodes(int node);
 
+    /** Returns the elements with coordinate Coord */
+    const std::vector<int> &GetCoordElements(Coord coord) { return coord_to_node[coord]; }
+
     /** Returns the coord of element e */
     const Coord &GetElementCoord(int e) { return node_to_coord[e]; }
 
