@@ -65,3 +65,6 @@ graph_solver
 
 # Configuration files
 Make.user
+
+# Debugging
+*.txt
