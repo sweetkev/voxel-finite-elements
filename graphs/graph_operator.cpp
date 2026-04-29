@@ -31,7 +31,8 @@ GraphOperator GraphOperator::Coarsen()
 SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                                                Graph &fine_graph,
                                                const std::vector<int> &fine_broken_to_true_dof,
-                                               const std::vector<std::set<int>> fine_dof_groups)
+                                               const std::vector<std::set<int>> &fine_dof_groups,
+                                               const Array<int> &graph_labeling)
 {
     const int dofs_per_elem = A_ref.Height();
     const int num_coarse_dofs = dof_groups.size();
@@ -39,40 +40,34 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
 
     SparseMatrix P(num_fine_dofs, num_coarse_dofs);
 
-    for (int coarse_e = 0; coarse_e < graph.Size(); ++coarse_e)
+    for (int fine_e = 0; fine_e < fine_graph.Size(); ++fine_e)
     {
-        // TODO: Generalize to n-dimensions
-        // Currently assumes 2D
-        Coord coarse_coord = graph.GetElementCoord(coarse_e);
-        for (int j = 0; j < 2; ++j)
-        {
-            for (int k = 0; k < 2; ++k)
-            {
-                Coord fine_coord(2 * coarse_coord[0] + j, 2 * coarse_coord[1] + k);
-                std::vector<int> fine_coord_elements = fine_graph.GetCoordElements(fine_coord);
+        const int coarse_e = graph_labeling[fine_e];
+        if (coarse_e < 0) { continue; }
 
-                if (!fine_coord_elements.empty())
-                {
-                    for (int fine_e : fine_coord_elements)
-                    {
-                        // Insert values into P using true global dof indices.
-                        Array<int> rows(dofs_per_elem);
-                        Array<int> cols(dofs_per_elem);
-                        for (int rf = 0; rf < dofs_per_elem; ++rf)
-                        {
-                            const int fine_tdof = fine_broken_to_true_dof[fine_e * dofs_per_elem + rf];
-                            rows[rf] = fine_tdof;
-                        }
-                        for (int rc = 0; rc < dofs_per_elem; ++rc)
-                        {
-                            const int coarse_tdof = broken_to_true_dof[coarse_e * dofs_per_elem + rc];
-                            cols[rc] = coarse_tdof;
-                        }
-                        P.SetSubMatrix(rows, cols, local_prolongation(j + 2*k));
-                    }
-                }
-            }
+        Coord coarse_coord = graph.GetElementCoord(coarse_e);
+        Coord fine_coord = fine_graph.GetElementCoord(fine_e);
+
+        // TODO: Generalize to n-dimensions. Currently assumes 2D.
+        const int dx = fine_coord[0] - 2 * coarse_coord[0];
+        const int dy = fine_coord[1] - 2 * coarse_coord[1];
+        if (dx < 0 || dx > 1 || dy < 0 || dy > 1) { continue; }
+
+        const int local_prolongation_index = dx + 2 * dy;
+
+        Array<int> rows(dofs_per_elem);
+        Array<int> cols(dofs_per_elem);
+        for (int rf = 0; rf < dofs_per_elem; ++rf)
+        {
+            const int fine_tdof = fine_broken_to_true_dof[fine_e * dofs_per_elem + rf];
+            rows[rf] = fine_tdof;
         }
+        for (int rc = 0; rc < dofs_per_elem; ++rc)
+        {
+            const int coarse_tdof = broken_to_true_dof[coarse_e * dofs_per_elem + rc];
+            cols[rc] = coarse_tdof;
+        }
+        P.SetSubMatrix(rows, cols, local_prolongation(local_prolongation_index));
     }
 
     // TODO: Handle boundary dofs in P

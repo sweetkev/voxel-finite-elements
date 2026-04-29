@@ -109,7 +109,8 @@ int main(int argc, char *argv[])
         local_prolongation,
         fine_graph,
         fine_graph_operator.GetBrokenToTrueDofMap(),
-        fine_graph_operator.GetDofGroups()));
+        fine_graph_operator.GetDofGroups(),
+        coarse_graph_operator.GetGraph().GetGraphLabeling()));
 
     {
         std::ofstream f("P.txt");

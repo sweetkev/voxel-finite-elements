@@ -42,10 +42,14 @@ public:
     /** Returns a graph over a coarsened mesh */
     Graph CoarsenGraph();
 
+    /** Returns the fine-to-coarse element labeling for the coarse graph */
+    const Array<int> &GetGraphLabeling() const { return graph_labeling; }
+
 private:
     Graph(Table &graph_,
           std::unordered_map<Coord, std::vector<int>> &coord_to_node_,
-          std::vector<Coord> &node_to_coord_, std::vector<Coord> &grid_cells_);
+          std::vector<Coord> &node_to_coord_, std::vector<Coord> &grid_cells_,
+          const Array<int> &graph_labeling_ = Array<int>());
 
     Table graph;
 
@@ -53,6 +57,7 @@ private:
     std::unordered_map<Coord, std::vector<int>> coord_to_node;
     std::vector<Coord> node_to_coord;
     std::vector<Coord> grid_cells; // Occupied grid cells
+    Array<int> graph_labeling;
 
     /**
      * Labels each node with the index of the node it
@@ -64,6 +69,6 @@ private:
                           std::vector<Coord> &coarse_grid_cells);
 
     /** Builds coarse graph according to graph labeling */
-    Table BuildCoarseGraph(Array<int> &graph_labeling,
+    Table BuildCoarseGraph(const Array<int> &graph_labeling,
         int coarse_ne);
 };

@@ -46,11 +46,13 @@ Table RemoveSelfConnections(Table &graph)
 
 Graph::Graph(Table &graph_,
              unordered_map<Coord, vector<int>> &coord_to_node_,
-             vector<Coord> &node_to_coord_, vector<Coord> &grid_cells_)
+             vector<Coord> &node_to_coord_, vector<Coord> &grid_cells_,
+             const Array<int> &graph_labeling_)
    : graph(graph_),
      coord_to_node(coord_to_node_),
      node_to_coord(node_to_coord_),
-     grid_cells(grid_cells_) { }
+     grid_cells(grid_cells_),
+     graph_labeling(graph_labeling_) { }
 
 Graph::Graph(const FiniteElementSpace &fes, const PixelImage &image_)
 {
@@ -98,7 +100,7 @@ Graph Graph::CoarsenGraph()
                                          coarse_node_to_coord.size());
 
    return Graph(coarse_graph, coarse_coord_to_node, coarse_node_to_coord,
-                coarse_grid_cells);
+                coarse_grid_cells, graph_labeling);
 }
 
 const Array<int> Graph::GetConnectedNodes(int node)
@@ -223,7 +225,7 @@ Array<int> Graph::LabelGraph(
    return graph_labeling;
 }
 
-Table Graph::BuildCoarseGraph(Array<int> &graph_labeling,
+Table Graph::BuildCoarseGraph(const Array<int> &graph_labeling,
                               int coarse_ne)
 {
    // Build connectivity matrix
