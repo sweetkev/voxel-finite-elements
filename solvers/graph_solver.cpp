@@ -68,15 +68,6 @@ int main(int argc, char *argv[])
     SparseMatrix &fine_A = fine_graph_operator.GetMatrix();
     SparseMatrix &coarse_A = coarse_graph_operator.GetMatrix();
 
-    {
-        std::ofstream f("A.txt");
-        A.PrintMatlab(f);
-    }
-    {
-        std::ofstream f("coarse_A.txt");
-        coarse_A->PrintMatlab(f);
-    }
-
     // Create prolongation operator from coarse to fine space
     // Ensure reference element fespace matches the others used
     Mesh reference_element = Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL);
@@ -112,11 +103,6 @@ int main(int argc, char *argv[])
         fine_graph_operator.GetBrokenToTrueDofMap(),
         fine_graph_operator.GetDofGroups(),
         coarse_graph_operator.GetGraph().GetGraphLabeling()));
-
-    {
-        std::ofstream f("P.txt");
-        P->PrintMatlab(f);
-    }
 
     // Create multigrid hierarchy
     Array<Operator*> operators(2);
