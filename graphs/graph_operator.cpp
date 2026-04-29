@@ -34,6 +34,8 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
                                                const std::vector<std::set<int>> &fine_dof_groups,
                                                const Array<int> &graph_labeling)
 {
+    static constexpr int map_from_lex[4] = {0, 1, 3, 2};
+
     const int dofs_per_elem = A_ref.Height();
     const int num_coarse_dofs = dof_groups.size();
     const int num_fine_dofs = fine_dof_groups.size();
@@ -51,9 +53,9 @@ SparseMatrix GraphOperator::CreateProlongation(DenseTensor &local_prolongation,
         // TODO: Generalize to n-dimensions. Currently assumes 2D.
         const int dx = fine_coord[0] - 2 * coarse_coord[0];
         const int dy = fine_coord[1] - 2 * coarse_coord[1];
-        if (dx < 0 || dx > 1 || dy < 0 || dy > 1) { continue; }
+        if (dx < 0 || dx > 1 || dy < 0 || dy > 1) { MFEM_ABORT(""); }
 
-        const int local_prolongation_index = dx + 2 * dy;
+        const int local_prolongation_index = map_from_lex[dx + 2 * dy];
 
         Array<int> rows(dofs_per_elem);
         Array<int> cols(dofs_per_elem);
