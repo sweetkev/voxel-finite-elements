@@ -65,7 +65,8 @@ int main(int argc, char *argv[])
 
     // Create coarse graph and its corresponding operator
     GraphOperator coarse_graph_operator = fine_graph_operator.Coarsen();
-    SparseMatrix *coarse_A = new SparseMatrix(coarse_graph_operator.GetMatrix());
+    SparseMatrix &fine_A = fine_graph_operator.GetMatrix();
+    SparseMatrix &coarse_A = coarse_graph_operator.GetMatrix();
 
     {
         std::ofstream f("A.txt");
@@ -125,15 +126,15 @@ int main(int argc, char *argv[])
     Array<bool> own_smoothers(2);
     Array<bool> own_prolongations(1);
 
-    operators[0] = coarse_A;
-    operators[1] = &A;
+    operators[0] = &coarse_A;
+    operators[1] = &fine_A;
 
-    smoothers[0] = new UMFPackSolver(*coarse_A);
-    smoothers[1] = new GSSmoother(A);
+    smoothers[0] = new UMFPackSolver(coarse_A);
+    smoothers[1] = new GSSmoother(fine_A);
 
     prolongations[0] = P;
 
-    own_operators[0] = true;
+    own_operators[0] = false;
     own_operators[1] = false;
     own_smoothers = true;
     own_prolongations = true;
@@ -147,7 +148,7 @@ int main(int argc, char *argv[])
     cg.SetRelTol(1e-12);
     cg.SetMaxIter(2000);
     cg.SetPrintLevel(1);
-    cg.SetOperator(A);
+    cg.SetOperator(fine_A);
     cg.SetPreconditioner(mg);
     cg.Mult(B, X);
 
