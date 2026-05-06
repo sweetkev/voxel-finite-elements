@@ -260,11 +260,6 @@ void GraphOperator::BuildA(std::vector<std::set<int>> dof_groups)
     Lambda.Finalize();
     A_hat.Finalize();
 
-    {
-        std::ofstream f("A_hat.txt");
-        A_hat.PrintMatlab(f);
-    }
-
     // Compute A = Lambda^T * hat{A} * Lambda
     A = *RAP(Lambda, A_hat, Lambda);
     A.Finalize();
