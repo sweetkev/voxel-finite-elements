@@ -96,21 +96,18 @@ int main(int argc, char *argv[])
 
     // Create multigrid hierarchy using graph operators
     vector<unique_ptr<GraphOperator>> graph_operators(nlevels);
-    vector<unique_ptr<SparseMatrix>> matrices(nlevels);
-    
-    // Create fine graph operator and matrices
+
+    // Create fine graph operator
     Graph fine_graph(fes, image);
     graph_operators[nlevels-1] = make_unique<GraphOperator>(reference_fes,
                                                               fine_graph,
                                                               h);
-    matrices[nlevels-1] = make_unique<SparseMatrix>(graph_operators[nlevels-1]->GetMatrix());
 
     // Create coarser levels
     for (int level = nlevels-2; level >= 0; --level)
     {
         graph_operators[level] = make_unique<GraphOperator>(
             graph_operators[level+1]->Coarsen());
-        matrices[level] = make_unique<SparseMatrix>(graph_operators[level]->GetMatrix());
     }
 
     // Create multigrid hierarchy
@@ -128,17 +125,18 @@ int main(int argc, char *argv[])
     // Set operators and smoothers for each level
     for (int level = 0; level < nlevels; level++)
     {
-        operators[level] = matrices[level].get();
+        SparseMatrix *A = &graph_operators[level]->GetMatrix();
+        operators[level] = A;
         
         if (level == 0)
         {
             // Coarsest level: direct solver
-            smoothers[level] = new UMFPackSolver(*matrices[level]);
+            smoothers[level] = new UMFPackSolver(*A);
         }
         else
         {
             // Finer levels: smoother
-            smoothers[level] = new GSSmoother(*matrices[level]);
+            smoothers[level] = new GSSmoother(*A);
         }
     }
 
@@ -165,7 +163,7 @@ int main(int argc, char *argv[])
     cg.SetRelTol(1e-12);
     cg.SetMaxIter(2000);
     cg.SetPrintLevel(1);
-    cg.SetOperator(*matrices[nlevels-1]);
+    cg.SetOperator(graph_operators[nlevels-1]->GetMatrix());
     cg.SetPreconditioner(mg);
     cg.Mult(B, X);
 
