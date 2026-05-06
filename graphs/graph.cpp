@@ -158,8 +158,13 @@ Array<int> Graph::LabelGraph(
       {
          const int ci = fine_node_component_index[i];
          const int cj = fine_node_component_index[j];
-         fine_node_component_index[j] = ci;
+         if (ci == cj) { return; }
+         for (int member : connected_components[cj])
+         {
+            fine_node_component_index[member] = ci;
+         }
          connected_components[ci].merge(connected_components[cj]);
+         connected_components[cj].clear();
       };
 
       // Initialize each element with its own label
