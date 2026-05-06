@@ -95,13 +95,14 @@ int main(int argc, char *argv[])
     const real_t h = mesh.GetMesh().GetElementSize(0, 0);
 
     // Create multigrid hierarchy using graph operators
-    vector<unique_ptr<Graph>> graphs(nlevels);
     vector<unique_ptr<GraphOperator>> graph_operators(nlevels);
     vector<unique_ptr<SparseMatrix>> matrices(nlevels);
     
-    // Create fine graph and operator
-    graphs[nlevels-1] = make_unique<Graph>(fes, image);
-    graph_operators[nlevels-1] = make_unique<GraphOperator>(reference_fes, *graphs[nlevels-1], h);
+    // Create fine graph operator and matrices
+    Graph fine_graph(fes, image);
+    graph_operators[nlevels-1] = make_unique<GraphOperator>(reference_fes,
+                                                              fine_graph,
+                                                              h);
     matrices[nlevels-1] = make_unique<SparseMatrix>(graph_operators[nlevels-1]->GetMatrix());
 
     // Create coarser levels
@@ -109,7 +110,6 @@ int main(int argc, char *argv[])
     {
         graph_operators[level] = make_unique<GraphOperator>(
             graph_operators[level+1]->Coarsen());
-        graphs[level] = make_unique<Graph>(graph_operators[level]->GetGraph());
         matrices[level] = make_unique<SparseMatrix>(graph_operators[level]->GetMatrix());
     }
 
@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            // Finer levels: iterative smoother
+            // Finer levels: smoother
             smoothers[level] = new GSSmoother(*matrices[level]);
         }
     }
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         SparseMatrix *P = new SparseMatrix(
             graph_operators[level]->CreateProlongation(
                 local_prolongation,
-                *graphs[level+1],
+                graph_operators[level+1]->GetGraph(),
                 graph_operators[level+1]->GetBrokenToTrueDofMap(),
                 graph_operators[level+1]->GetDofGroups(),
                 graph_operators[level]->GetGraph().GetGraphLabeling()));

@@ -20,16 +20,16 @@ public:
     const Table &GetGraph() { return graph; }
 
     /** Returns the array of nodes connected to current node */
-    const Array<int> GetConnectedNodes(int node);
+    const Array<int> GetConnectedNodes(int node) const;
 
     /** Returns the elements with coordinate Coord */
-    const std::vector<int> &GetCoordElements(Coord coord) { return coord_to_node[coord]; }
+    const std::vector<int> &GetCoordElements(Coord coord) const { return coord_to_node.at(coord); }
 
     /** Returns the coord of element e */
-    const Coord &GetElementCoord(int e) { return node_to_coord[e]; }
+    const Coord &GetElementCoord(int e) const { return node_to_coord[e]; }
 
     /** Returns the occupied grid cells */
-    const std::vector<Coord> &GetGridCells() { return grid_cells; }
+    const std::vector<Coord> &GetGridCells() const { return grid_cells; }
 
     /** Returns index of the connection between node i and node j.
      * If there is no connection between node i and node j established in the

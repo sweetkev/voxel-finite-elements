@@ -22,7 +22,7 @@ public:
     *   local prolongation defined on the reference element.
     */
     SparseMatrix CreateProlongation(DenseTensor &local_prolongation,
-                                    Graph &fine_graph,
+                                    const Graph &fine_graph,
                                     const std::vector<int> &fine_broken_to_true_dof,
                                     const std::vector<std::set<int>> &fine_dof_groups,
                                     const Array<int> &graph_labeling);

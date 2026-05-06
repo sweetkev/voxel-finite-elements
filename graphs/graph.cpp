@@ -103,7 +103,7 @@ Graph Graph::CoarsenGraph()
                 coarse_grid_cells, graph_labeling);
 }
 
-const Array<int> Graph::GetConnectedNodes(int node)
+const Array<int> Graph::GetConnectedNodes(int node) const
 {
    Array<int> connected_nodes;
    graph.GetRow(node, connected_nodes);
