@@ -49,27 +49,17 @@ int main(int argc, char *argv[])
     Vector X, B;
     a.FormLinearSystem(ess_dofs, x, b, A, X, B);
 
-    //create multigrid operator
-    //create reference mesh
-    Mesh reference_mesh = CreateReferenceMesh(mesh.GetMesh().Dimension());
-    H1_FECollection reference_fec(order, reference_mesh.Dimension());
-    FiniteElementSpace reference_fes(&reference_mesh, &reference_fec);
+    // If nlevels was not specified, coarsen until smallest dimension is 1
+    if(nlevels < 0) {
+      int width = mesh.GetWidth();
+      int height = mesh.GetHeight();
+      
+      // Find the number of coarsenings until height or width is 1
+      nlevels = max(ceil(log2(width)), ceil(log2(height)));
+      cout << "new nlevels: " << nlevels << "\n";
+    }
 
-    // Create fine graph
-    Graph fine_graph(fes, image);
-
-    const real_t h = mesh.GetMesh().GetElementSize(0, 0);
-
-    // Create a GraphOperator for the fine graph to get the broken->true dof map
-    GraphOperator fine_graph_operator(reference_fes, fine_graph, h);
-
-    // Create coarse graph and its corresponding operator
-    GraphOperator coarse_graph_operator = fine_graph_operator.Coarsen();
-    SparseMatrix &fine_A = fine_graph_operator.GetMatrix();
-    SparseMatrix &coarse_A = coarse_graph_operator.GetMatrix();
-
-    // Create prolongation operator from coarse to fine space
-    // Ensure reference element fespace matches the others used
+    //create reference mesh and compute local prolongation
     Mesh reference_element = Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL);
     H1_FECollection single_fec(order, reference_element.Dimension());
     FiniteElementSpace single_fes(&reference_element, &single_fec);
@@ -97,33 +87,74 @@ int main(int argc, char *argv[])
         fe->GetLocalInterpolation(isotr, local_prolongation(i));
     }
 
-    SparseMatrix *P = new SparseMatrix(coarse_graph_operator.CreateProlongation(
-        local_prolongation,
-        fine_graph,
-        fine_graph_operator.GetBrokenToTrueDofMap(),
-        fine_graph_operator.GetDofGroups(),
-        coarse_graph_operator.GetGraph().GetGraphLabeling()));
+    //create reference mesh for fespace
+    Mesh reference_mesh = CreateReferenceMesh(mesh.GetMesh().Dimension());
+    H1_FECollection reference_fec(order, reference_mesh.Dimension());
+    FiniteElementSpace reference_fes(&reference_mesh, &reference_fec);
+
+    const real_t h = mesh.GetMesh().GetElementSize(0, 0);
+
+    // Create multigrid hierarchy using graph operators
+    vector<unique_ptr<Graph>> graphs(nlevels);
+    vector<unique_ptr<GraphOperator>> graph_operators(nlevels);
+    vector<unique_ptr<SparseMatrix>> matrices(nlevels);
+    
+    // Create fine graph and operator
+    graphs[nlevels-1] = make_unique<Graph>(fes, image);
+    graph_operators[nlevels-1] = make_unique<GraphOperator>(reference_fes, *graphs[nlevels-1], h);
+    matrices[nlevels-1] = make_unique<SparseMatrix>(graph_operators[nlevels-1]->GetMatrix());
+
+    // Create coarser levels
+    for (int level = nlevels-2; level >= 0; --level)
+    {
+        graph_operators[level] = make_unique<GraphOperator>(
+            graph_operators[level+1]->Coarsen());
+        graphs[level] = make_unique<Graph>(graph_operators[level]->GetGraph());
+        matrices[level] = make_unique<SparseMatrix>(graph_operators[level]->GetMatrix());
+    }
 
     // Create multigrid hierarchy
-    Array<Operator*> operators(2);
-    Array<Solver*> smoothers(2);
-    Array<Operator*> prolongations(1);
-    Array<bool> own_operators(2);
-    Array<bool> own_smoothers(2);
-    Array<bool> own_prolongations(1);
+    Array<Operator*> operators(nlevels);
+    Array<Solver*> smoothers(nlevels);
+    Array<Operator*> prolongations(nlevels - 1);
+    Array<bool> own_operators(nlevels);
+    Array<bool> own_smoothers(nlevels);
+    Array<bool> own_prolongations(nlevels - 1);
 
-    operators[0] = &coarse_A;
-    operators[1] = &fine_A;
-
-    smoothers[0] = new UMFPackSolver(coarse_A);
-    smoothers[1] = new GSSmoother(fine_A);
-
-    prolongations[0] = P;
-
-    own_operators[0] = false;
-    own_operators[1] = false;
+    own_operators = false;
     own_smoothers = true;
-    own_prolongations = true;
+    own_prolongations = false;
+
+    // Set operators and smoothers for each level
+    for (int level = 0; level < nlevels; level++)
+    {
+        operators[level] = matrices[level].get();
+        
+        if (level == 0)
+        {
+            // Coarsest level: direct solver
+            smoothers[level] = new UMFPackSolver(*matrices[level]);
+        }
+        else
+        {
+            // Finer levels: iterative smoother
+            smoothers[level] = new GSSmoother(*matrices[level]);
+        }
+    }
+
+    // Create prolongation operators between levels
+    for (int level = 0; level < nlevels - 1; level++)
+    {
+        SparseMatrix *P = new SparseMatrix(
+            graph_operators[level]->CreateProlongation(
+                local_prolongation,
+                *graphs[level+1],
+                graph_operators[level+1]->GetBrokenToTrueDofMap(),
+                graph_operators[level+1]->GetDofGroups(),
+                graph_operators[level]->GetGraph().GetGraphLabeling()));
+        prolongations[level] = P;
+        own_prolongations[level] = true;
+    }
 
 
     Multigrid mg(operators, smoothers, prolongations, own_operators,
@@ -134,7 +165,7 @@ int main(int argc, char *argv[])
     cg.SetRelTol(1e-12);
     cg.SetMaxIter(2000);
     cg.SetPrintLevel(1);
-    cg.SetOperator(fine_A);
+    cg.SetOperator(*matrices[nlevels-1]);
     cg.SetPreconditioner(mg);
     cg.Mult(B, X);
 
