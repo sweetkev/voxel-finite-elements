@@ -29,10 +29,11 @@ int main(int argc, char *argv[])
                                                          &fec);
 
    Array<int> *fine_ess_dofs = new Array<int>;
-   fine_fes->GetBoundaryTrueDofs(*fine_ess_dofs);
+   // fine_fes->GetBoundaryTrueDofs(*fine_ess_dofs);
 
    BilinearForm fine_a(fine_fes);
    fine_a.AddDomainIntegrator(new DiffusionIntegrator);
+   fine_a.AddDomainIntegrator(new MassIntegrator);
    fine_a.Assemble();
 
    //initial guess
@@ -82,7 +83,7 @@ int main(int argc, char *argv[])
 
    operators[nlevels-1] = &fine_A;
 
-   DSmoother fine_smoother(fine_A);
+   GSSmoother fine_smoother(fine_A);
    smoothers[nlevels-1] = &fine_smoother;
 
    for (int level = nlevels-2; level >= 0; --level)
@@ -115,7 +116,7 @@ int main(int argc, char *argv[])
       }
       else
       {
-         smoothers[level] = new DSmoother(*coarse_A.As<SparseMatrix>());
+         smoothers[level] = new GSSmoother(*coarse_A.As<SparseMatrix>());
       }
       own_smoothers[level] = true;
 
