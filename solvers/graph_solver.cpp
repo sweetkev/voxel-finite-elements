@@ -104,10 +104,16 @@ int main(int argc, char *argv[])
                                                               h);
 
     // Create coarser levels
+    int width = mesh.GetWidth();
+    int height = mesh.GetHeight();
+    cout << "initial dimensions: " << width << " x " << height << "\n";
     for (int level = nlevels-2; level >= 0; --level)
     {
         graph_operators[level] = make_unique<GraphOperator>(
             graph_operators[level+1]->Coarsen());
+        width = width / 2;
+        height = height / 2;
+        cout << "new dimensions: " << width << " x " << height << "\n";
     }
 
     // Create multigrid hierarchy
