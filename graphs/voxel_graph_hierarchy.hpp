@@ -14,12 +14,12 @@ public:
                         const FiniteElementSpace &reference_fes, real_t h);
 
     vector<unique_ptr<VoxelGraphOperator>> &GetGraphOperators() { return graph_operators; }
-    vector<unique_ptr<SparseMatrix>> &GetProlongations() { return prolongations; }
+    Array<Operator*> &GetProlongations() { return prolongations; }
 
 private:
     vector<unique_ptr<VoxelGraph>> graphs;
     vector<unique_ptr<VoxelGraphOperator>> graph_operators;
-    vector<unique_ptr<SparseMatrix>> prolongations;
+    Array<Operator*> prolongations;
 
     FiniteElementSpace reference_fes;
     DenseTensor local_prolongation;

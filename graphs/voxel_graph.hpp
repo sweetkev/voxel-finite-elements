@@ -14,7 +14,7 @@ public:
     // Create a graph where each vertex of the graph corresponds to an occupied
     // pixel/voxel in the image, and edges are created using vertex adjacency
     // of the pixels/voxels. 
-    VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_);
+    VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, const FiniteElementSpace &reference_fes);
 
     // Returns the graph over a coarsened mesh. Each grid cell of the coarse
     // mesh is obtained by coarsening a 2x2(x2) block of grid cells in the fine

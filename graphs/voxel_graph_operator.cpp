@@ -1,5 +1,3 @@
-#pragma once
-
 #include "mfem.hpp"
 #include "voxel_graph_operator.hpp"
 

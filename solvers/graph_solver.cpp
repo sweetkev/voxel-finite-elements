@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     const real_t h = mesh.GetMesh().GetElementSize(0, 0);
 
     // Create multigrid hierarchy
-    VoxelGraph fine_graph(fes, image);
+    VoxelGraph fine_graph(fes, image, reference_fes);
     VoxelGraphHierarchy graph_hierarchy(make_unique<VoxelGraph>(fine_graph), nlevels, reference_fes, h);
 
     // Create multigrid hierarchy
@@ -81,15 +81,15 @@ int main(int argc, char *argv[])
 
     own_operators = false;
     own_smoothers = true;
-    own_prolongations = false;
+    own_prolongations = true;
+
+    prolongations = graph_hierarchy.GetProlongations();
 
     // Set operators and smoothers for each level
     for (int level = 0; level < nlevels; level++)
     {
         SparseMatrix *A = &graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
         operators[level] = A;
-        SparseMatrix *P = graph_hierarchy.GetProlongations()[level].get();
-        prolongations[level] = P;
         
         if (level == 0)
         {

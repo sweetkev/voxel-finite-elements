@@ -41,7 +41,8 @@ Table RemoveSelfConnections(Table &graph)
 }
 }
 
-VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_)
+VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, const FiniteElementSpace &reference_fes_)
+    : reference_fes(reference_fes_)
 {
    // Element-to-element table is (element-to-dof) * (dof-to-element)
    const Table &element_to_dof = fes.GetElementToDofTable();
@@ -69,6 +70,9 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_)
          }
       }
    }
+
+   CreateReferenceDofMap();
+   CreateDofGroups();
 }
 
 VoxelGraph VoxelGraph::CoarsenGraph()

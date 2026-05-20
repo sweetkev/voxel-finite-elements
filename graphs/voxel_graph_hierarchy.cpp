@@ -11,12 +11,18 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
 
-    graphs.emplace_back(move(fine_graph));
-    for (int i = 1; i < nlevels; ++i)
+    graphs.reserve(nlevels);
+    graph_operators.reserve(nlevels);
+    prolongations.SetSize(nlevels - 1);
+
+    graphs[nlevels - 1] = move(fine_graph);
+    graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h);
+    for (int i = nlevels - 2; i >= 0; --i)
     {
-        graphs.emplace_back(make_unique<VoxelGraph>(graphs[i-1]->CoarsenGraph()));
-        graph_operators.emplace_back(make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0*h));
-        prolongations.emplace_back(make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i-1])));
+        graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph());
+        graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0 * h);
+        SparseMatrix* P = new SparseMatrix(CreateProlongation(*graphs[i], *graphs[i + 1]));
+        prolongations[i] = P;
     }
 }
 
@@ -38,6 +44,8 @@ void VoxelGraphHierarchy::CreateLocalProlongation(int dim)
     {
         MFEM_ABORT("Unsupported dimension.");
     }
+
+    element.UniformRefinement();
 
     // Create local prolongation by refining a single element.
     const CoarseFineTransformations &rtrans = element.GetRefinementTransforms();
