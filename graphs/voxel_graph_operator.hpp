@@ -6,6 +6,30 @@
 class VoxelGraphOperator
 {
 public:
+    VoxelGraphOperator(FiniteElementSpace &reference_fes_, VoxelGraph &graph_, real_t h_);
+
+    SparseMatrix &GetMatrix() { return A; }
 
 private:
+    real_t h;
+
+    DenseMatrix A_ref;
+    FiniteElementSpace reference_fes;
+
+    SparseMatrix A;
+
+    VoxelGraph graph;
+
+    VoxelGraphOperator();
+
+    // Builds the matrix A_ref representing the stiffness matrix over the
+    // reference element.
+    void BuildARef();
+
+    // Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
+    // hat{A} is the block diagonal matrix with blocks corresponding to the
+    // local element matrix A_ref, and Lambda is the boolean matrix mapping
+    // broken dofs to the true dofs.
+    void BuildA(const std::vector<std::set<int>> dof_groups, 
+                const std::vector<int> &broken_to_true_dof);
 };

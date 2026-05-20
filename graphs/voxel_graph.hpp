@@ -22,6 +22,22 @@ public:
     // becomes a new vertex in the coarse graph.
     VoxelGraph CoarsenGraph();
 
+    const vector<set<int>> &GetDofGroups() const { return dof_groups; }
+
+    const vector<int> &GetBrokenToTrueDofMap() const 
+    { 
+        return broken_to_true_dof; 
+    }
+
+    const vector<int> &GetFineToCoarseElementMap() const 
+    { 
+        return fine_to_coarse_element_map;
+    }
+
+    const Coord &GetElementCoord(int e) const { return element_to_coord[e]; }
+
+    int Size() const { return graph.Size(); }
+
 private:
     // Graph structure
     Table graph;

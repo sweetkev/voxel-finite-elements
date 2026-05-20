@@ -5,17 +5,18 @@
 
 VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, 
                     int nlevels, 
-                    const FiniteElementSpace &reference_fes_)
-                    : reference_fes(reference_fes_)
+                    const FiniteElementSpace &reference_fes_,
+                    real_t h_)
+                    : reference_fes(reference_fes_), h(h_)
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
 
-    graphs.push_back(fine_graph);
+    graphs.emplace_back(move(fine_graph));
     for (int i = 1; i < nlevels; ++i)
     {
-        graphs.push_back(make_unique<VoxelGraph>(graphs[i-1]->CoarsenGraph()));
-        // graph_operators.push_back(make_unique<VoxelGraphOperator>(*graphs[i]));
-        prolongations.push_back(make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i-1])));
+        graphs.emplace_back(make_unique<VoxelGraph>(graphs[i-1]->CoarsenGraph()));
+        graph_operators.emplace_back(make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0*h));
+        prolongations.emplace_back(make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i-1])));
     }
 }
 
@@ -56,6 +57,60 @@ void VoxelGraphHierarchy::CreateLocalProlongation(int dim)
         isotr.SetPointMat(pmats(i));
         fe->GetLocalInterpolation(isotr, local_prolongation(i));
     }
+}
+
+SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_graph, 
+                                        const VoxelGraph &fine_graph)
+{
+    static constexpr int map_from_lex[4] = {0, 1, 3, 2};
+
+    const vector<set<int>> &coarse_dof_groups = coarse_graph.GetDofGroups();
+    const vector<int> &coarse_broken_to_true_dof = coarse_graph.GetBrokenToTrueDofMap();
+    const vector<set<int>> &fine_dof_groups = fine_graph.GetDofGroups();
+    const vector<int> &fine_broken_to_true_dof = fine_graph.GetBrokenToTrueDofMap();
+    const vector<int> &fine_to_coarse_element_map = fine_graph.GetFineToCoarseElementMap();
+
+    const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
+    const int num_coarse_dofs = coarse_dof_groups.size();
+    const int num_fine_dofs = fine_dof_groups.size();
+
+    SparseMatrix P(num_fine_dofs, num_coarse_dofs);
+
+    for (int fine_e = 0; fine_e < fine_graph.Size(); ++fine_e)
+    {
+        const int coarse_e = fine_to_coarse_element_map[fine_e];
+        if (coarse_e < 0) { continue; }
+
+        Coord coarse_coord = coarse_graph.GetElementCoord(coarse_e);
+        Coord fine_coord = fine_graph.GetElementCoord(fine_e);
+
+        // TODO: Generalize to n-dimensions. Currently assumes 2D.
+        const int dx = fine_coord[0] - 2 * coarse_coord[0];
+        const int dy = fine_coord[1] - 2 * coarse_coord[1];
+        if (dx < 0 || dx > 1 || dy < 0 || dy > 1) { MFEM_ABORT(""); }
+
+        const int local_prolongation_index = map_from_lex[dx + 2 * dy];
+
+        Array<int> rows(dofs_per_elem);
+        Array<int> cols(dofs_per_elem);
+        for (int rf = 0; rf < dofs_per_elem; ++rf)
+        {
+            const int fine_tdof = fine_broken_to_true_dof[fine_e * dofs_per_elem + rf];
+            rows[rf] = fine_tdof;
+        }
+        for (int rc = 0; rc < dofs_per_elem; ++rc)
+        {
+            const int coarse_tdof = coarse_broken_to_true_dof[coarse_e * dofs_per_elem + rc];
+            cols[rc] = coarse_tdof;
+        }
+        P.SetSubMatrix(rows, cols, local_prolongation(local_prolongation_index));
+    }
+
+    // TODO: Handle boundary dofs in P
+
+    P.Finalize();
+
+    return P;
 }
 
 Mesh CreateReferenceMesh(int dim)

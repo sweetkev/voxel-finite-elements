@@ -18,8 +18,9 @@ SRCS := \
 	graph_solver.cpp \
 	$(SRC_DIR)/meshing/ppm.cpp \
 	$(SRC_DIR)/meshing/pixel_mesh.cpp \
-    $(SRC_DIR)/graphs/graph.cpp \
-	$(SRC_DIR)/graphs/graph_operator.cpp
+    $(SRC_DIR)/graphs/voxel_graph.cpp \
+	$(SRC_DIR)/graphs/voxel_graph_operator.cpp \
+	$(SRC_DIR)/graphs/voxel_graph_hierarchy.cpp
 
 OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
