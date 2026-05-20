@@ -3,26 +3,25 @@
 #include "voxel_graph.hpp"
 #include "voxel_graph_operator.hpp"
 
-VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, 
-                    int nlevels, 
+VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
+                    int nlevels,
                     const FiniteElementSpace &reference_fes_,
                     real_t h_)
                     : reference_fes(reference_fes_), h(h_)
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
 
-    graphs.reserve(nlevels);
-    graph_operators.reserve(nlevels);
-    prolongations.SetSize(nlevels - 1);
+    graphs.resize(nlevels);
+    graph_operators.resize(nlevels);
+    prolongations.resize(nlevels - 1);
 
-    graphs[nlevels - 1] = move(fine_graph);
+    graphs[nlevels - 1] = std::move(fine_graph);
     graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h);
     for (int i = nlevels - 2; i >= 0; --i)
     {
         graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph());
         graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0 * h);
-        SparseMatrix* P = new SparseMatrix(CreateProlongation(*graphs[i], *graphs[i + 1]));
-        prolongations[i] = P;
+        prolongations[i] = make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i + 1]));
     }
 }
 
@@ -67,7 +66,7 @@ void VoxelGraphHierarchy::CreateLocalProlongation(int dim)
     }
 }
 
-SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_graph, 
+SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_graph,
                                         const VoxelGraph &fine_graph)
 {
     static constexpr int map_from_lex[4] = {0, 1, 3, 2};

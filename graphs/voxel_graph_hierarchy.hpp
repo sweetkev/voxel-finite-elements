@@ -14,19 +14,19 @@ public:
                         const FiniteElementSpace &reference_fes, real_t h);
 
     vector<unique_ptr<VoxelGraphOperator>> &GetGraphOperators() { return graph_operators; }
-    Array<Operator*> &GetProlongations() { return prolongations; }
+    vector<unique_ptr<Operator>> &GetProlongations() { return prolongations; }
 
 private:
     vector<unique_ptr<VoxelGraph>> graphs;
     vector<unique_ptr<VoxelGraphOperator>> graph_operators;
-    Array<Operator*> prolongations;
+    vector<unique_ptr<Operator>> prolongations;
 
     FiniteElementSpace reference_fes;
     DenseTensor local_prolongation;
 
     real_t h;
 
-    // Builds the local prolongation matrices obtained by refining a single 
+    // Builds the local prolongation matrices obtained by refining a single
     // element.
     void CreateLocalProlongation(int dim);
 

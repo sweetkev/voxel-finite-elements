@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     if(nlevels < 0) {
       int width = mesh.GetWidth();
       int height = mesh.GetHeight();
-      
+
       // Find the number of coarsenings until height or width is 1
       nlevels = max(ceil(log2(width)), ceil(log2(height)));
       cout << "new nlevels: " << nlevels << "\n";
@@ -68,8 +68,9 @@ int main(int argc, char *argv[])
     const real_t h = mesh.GetMesh().GetElementSize(0, 0);
 
     // Create multigrid hierarchy
-    VoxelGraph fine_graph(fes, image, reference_fes);
-    VoxelGraphHierarchy graph_hierarchy(make_unique<VoxelGraph>(fine_graph), nlevels, reference_fes, h);
+    VoxelGraphHierarchy graph_hierarchy(
+        make_unique<VoxelGraph>(fes, image, reference_fes),
+        nlevels, reference_fes, h);
 
     // Create multigrid hierarchy
     Array<Operator*> operators(nlevels);
@@ -81,16 +82,19 @@ int main(int argc, char *argv[])
 
     own_operators = false;
     own_smoothers = true;
-    own_prolongations = true;
+    own_prolongations = false;
 
-    prolongations = graph_hierarchy.GetProlongations();
+    for (int level = 0; level < nlevels - 1; ++level)
+    {
+        prolongations[level] = graph_hierarchy.GetProlongations()[level].get();
+    }
 
     // Set operators and smoothers for each level
     for (int level = 0; level < nlevels; level++)
     {
         SparseMatrix *A = &graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
         operators[level] = A;
-        
+
         if (level == 0)
         {
             // Coarsest level: direct solver
