@@ -84,18 +84,18 @@ VoxelGraph VoxelGraph::CoarsenGraph()
 
     // Initialize maps between coarse grid cells and fine elements
     vector<Coord> fine_element_to_coarse_coord(graph.Size());
-    unordered_map<Coord, vector<int>> coarse_coord_to_fine_elements; 
+    unordered_map<Coord, vector<int>> coarse_coord_to_fine_elements;
 
     // Find coarse grid cells
     for (Coord fine_coord : grid_cells)
     {
         Coord coarse_coord(fine_coord[0]/2, fine_coord[1]/2);
-      
+
         // Only add each coarse grid cell to list once
-        const auto coarse_coord_visited = find(coarse_grid_cells.begin(), 
-                                               coarse_grid_cells.end(), 
+        const auto coarse_coord_visited = find(coarse_grid_cells.begin(),
+                                               coarse_grid_cells.end(),
                                                coarse_coord);
-        if (coarse_coord_visited == coarse_grid_cells.end())  
+        if (coarse_coord_visited == coarse_grid_cells.end())
         {
             coarse_grid_cells.push_back(coarse_coord);
         }
@@ -174,6 +174,7 @@ VoxelGraph VoxelGraph::CoarsenGraph()
         }
 
         // Label graph nodes by their connected component
+        fine_to_coarse_element_map.resize(graph.Size());
         for (int fine_element : fine_elements)
         {
             fine_to_coarse_element_map[fine_element] = coarse_element_counter +
@@ -213,13 +214,13 @@ VoxelGraph VoxelGraph::CoarsenGraph()
    // Remove self-adjacencies
    Table coarse_graph = RemoveSelfConnections(coarse_graph_temp2);
 
-   return VoxelGraph(coarse_graph, coarse_grid_cells, coarse_coord_to_element, 
+   return VoxelGraph(coarse_graph, coarse_grid_cells, coarse_coord_to_element,
                      coarse_element_to_coord, reference_fes);
 }
 
 VoxelGraph::VoxelGraph(Table &graph_, vector<Coord> &grid_cells_,
                          unordered_map<Coord, vector<int>> &coord_to_element_,
-                         vector<Coord> &element_to_coord_, 
+                         vector<Coord> &element_to_coord_,
                          const FiniteElementSpace &reference_fes_)
     : graph(graph_), grid_cells(grid_cells_),
       coord_to_element(coord_to_element_), element_to_coord(element_to_coord_),
