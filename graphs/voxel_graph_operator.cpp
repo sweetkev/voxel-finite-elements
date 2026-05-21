@@ -1,5 +1,6 @@
 #include "mfem.hpp"
 #include "voxel_graph_operator.hpp"
+#include "voxel_graph.hpp"
 
 VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
                                          VoxelGraph &graph_, real_t h_)

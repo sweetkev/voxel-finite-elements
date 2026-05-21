@@ -27,16 +27,16 @@ OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 
 INCLUDES := $(MFEM_INCFLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
-CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP -g
+CXXFLAGS := $(MFEM_CXXFLAGS) -fsanitize=address $(INCLUDES) -MMD -MP -g
 
 
 all: dirichlet_2d graph_solver
 
 dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
+	$(MFEM_CXX) $(MFEM_CXXFLAGS) -fsanitize=address $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
 
 graph_solver: $(OBJS)
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+	$(MFEM_CXX) $(MFEM_CXXFLAGS) -fsanitize=address $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)

@@ -184,11 +184,11 @@ VoxelGraph VoxelGraph::CoarsenGraph()
         coarse_element_counter += nonempty_component_counter;
     }
 
-    // Create map between a grid cell coordinate and the nodes it contains
+    // Create map between coarse elements and their coordinates
     coarse_element_to_coord.resize(coarse_element_counter);
     for (Coord coarse_coord : coarse_grid_cells)
     {
-        for (int coarse_element : coarse_coord_to_fine_elements[coarse_coord])
+        for (int coarse_element : coarse_coord_to_element[coarse_coord])
         {
             coarse_element_to_coord[coarse_element] = coarse_coord;
         }
@@ -225,7 +225,10 @@ VoxelGraph::VoxelGraph(Table &graph_, vector<Coord> &grid_cells_,
     : graph(graph_), grid_cells(grid_cells_),
       coord_to_element(coord_to_element_), element_to_coord(element_to_coord_),
       reference_fes(reference_fes_)
-{ }
+{ 
+    CreateReferenceDofMap();
+    CreateDofGroups();
+}
 
 void VoxelGraph::CreateReferenceDofMap()
 {
