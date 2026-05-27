@@ -67,8 +67,8 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
     A_hat.Finalize();
 
     // Compute A = Lambda^T * hat{A} * Lambda
-    A = *RAP(Lambda, A_hat, Lambda);
-    A.Finalize();
+    std::unique_ptr<SparseMatrix> A_ptr(RAP(Lambda, A_hat, Lambda));
+    A.Swap(*A_ptr);
 
     // TODO: Eliminate boundary dofs from coarse operator
 }
