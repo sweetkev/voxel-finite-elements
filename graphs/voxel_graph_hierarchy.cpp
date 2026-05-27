@@ -32,17 +32,16 @@ void VoxelGraphHierarchy::CreateLocalProlongation(int dim)
     if (dim == 2)
     {
         element = Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL);
-        geom = Geometry::SQUARE;
     }
     else if (dim == 3)
     {
         element = Mesh::MakeCartesian3D(1, 1, 1, Element::HEXAHEDRON);
-        geom = Geometry::CUBE;
     }
     else
     {
         MFEM_ABORT("Unsupported dimension.");
     }
+    geom = element.GetTypicalElementGeometry();
 
     element.UniformRefinement();
 
