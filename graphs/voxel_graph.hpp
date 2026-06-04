@@ -34,6 +34,11 @@ public:
         return fine_to_coarse_element_map;
     }
 
+    const vector<set<int>> &GetCoarseToFineElementsMap() const
+    {
+        return coarse_to_fine_elements_map;
+    }
+
     const Coord &GetElementCoord(int e) const { return element_to_coord[e]; }
 
     int Size() const { return graph.Size(); }
@@ -50,6 +55,7 @@ private:
     // Fine-to-coarse element map. This is the "labeling" of each fine element
     // that determines which coarse element it belongs to.
     vector<int> fine_to_coarse_element_map;
+    vector<set<int>> coarse_to_fine_elements_map;
 
     // Reference FES needed to determine DoF identification
     FiniteElementSpace reference_fes;
@@ -60,7 +66,7 @@ private:
 
     // Maps each broken dof index to the true dof index.
     // Size is (ne * dofs_per_element).
-    std::vector<int> broken_to_true_dof;
+    vector<int> broken_to_true_dof;
 
     // Matrix whose (i,j) entry denotes the local dof number on reference
     // element j which is identified with the local dof i on

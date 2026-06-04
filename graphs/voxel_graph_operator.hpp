@@ -19,8 +19,7 @@ private:
     SparseMatrix A;
 
     VoxelGraph graph;
-
-    VoxelGraphOperator();
+    const SparseMatrix P;
 
     // Builds the matrix A_ref representing the stiffness matrix over the
     // reference element.

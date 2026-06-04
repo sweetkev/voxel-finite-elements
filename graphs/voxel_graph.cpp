@@ -194,6 +194,14 @@ VoxelGraph VoxelGraph::CoarsenGraph()
         }
    }
 
+    // Create map between coarse elements and fine elements
+    coarse_to_fine_elements_map.resize(coarse_element_counter);
+    for (int fine_element = 0; fine_element < graph.Size(); ++fine_element)
+    {
+        int coarse_element = fine_to_coarse_element_map[fine_element];
+        coarse_to_fine_elements_map[coarse_element].insert(fine_element);
+    }
+
    // Build coarse graph according to coarse element labeling
    // Build connectivity matrix P
    Table P(graph.Size(), 1);
