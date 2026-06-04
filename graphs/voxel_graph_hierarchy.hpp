@@ -11,7 +11,8 @@ class VoxelGraphHierarchy
 {
 public:
     VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, int nlevels,
-                        const FiniteElementSpace &reference_fes, real_t h);
+                        FiniteElementSpace &reference_fes, real_t h,
+                        BilinearForm &a);
 
     vector<unique_ptr<VoxelGraphOperator>> &GetGraphOperators() { return graph_operators; }
     vector<unique_ptr<Operator>> &GetProlongations() { return prolongations; }
@@ -21,7 +22,7 @@ private:
     vector<unique_ptr<VoxelGraphOperator>> graph_operators;
     vector<unique_ptr<Operator>> prolongations;
 
-    FiniteElementSpace reference_fes;
+    FiniteElementSpace &reference_fes;
     DenseTensor local_prolongation;
 
     real_t h;

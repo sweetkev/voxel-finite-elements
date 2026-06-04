@@ -5,8 +5,8 @@
 
 VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
                     int nlevels,
-                    const FiniteElementSpace &reference_fes_,
-                    real_t h_)
+                    FiniteElementSpace &reference_fes_,
+                    real_t h_, BilinearForm &a)
                     : reference_fes(reference_fes_), h(h_)
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
@@ -16,11 +16,11 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     prolongations.resize(nlevels - 1);
 
     graphs[nlevels - 1] = std::move(fine_graph);
-    graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h);
+    graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h, a);
     for (int i = nlevels - 2; i >= 0; --i)
     {
         graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph());
-        graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0 * h);
+        graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0 * h, a);
         prolongations[i] = make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i + 1]));
     }
 }

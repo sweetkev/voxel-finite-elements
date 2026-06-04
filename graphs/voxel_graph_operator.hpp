@@ -6,7 +6,7 @@
 class VoxelGraphOperator
 {
 public:
-    VoxelGraphOperator(FiniteElementSpace &reference_fes_, VoxelGraph &graph_, real_t h_);
+    VoxelGraphOperator(FiniteElementSpace &reference_fes_, VoxelGraph &graph_, real_t h_, BilinearForm &a);
 
     SparseMatrix &GetMatrix() { return A; }
 
@@ -14,15 +14,15 @@ private:
     real_t h;
 
     DenseMatrix A_ref;
-    FiniteElementSpace reference_fes;
+    FiniteElementSpace &reference_fes;
 
     SparseMatrix A;
 
-    VoxelGraph graph;
+    VoxelGraph &graph;
 
     // Builds the matrix A_ref representing the stiffness matrix over the
     // reference element.
-    void BuildARef();
+    void BuildARef(BilinearForm &a);
 
     // Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
     // hat{A} is the block diagonal matrix with blocks corresponding to the

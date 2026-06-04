@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     // Create multigrid hierarchy
     VoxelGraphHierarchy graph_hierarchy(
         make_unique<VoxelGraph>(fes, image, reference_fes),
-        nlevels, reference_fes, h);
+        nlevels, reference_fes, h, a);
 
     // Create multigrid hierarchy
     Array<Operator*> operators(nlevels);

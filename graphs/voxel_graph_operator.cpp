@@ -3,20 +3,19 @@
 #include "voxel_graph.hpp"
 
 VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
-                                         VoxelGraph &graph_, real_t h_)
+                                         VoxelGraph &graph_, real_t h_, BilinearForm &a)
     : h(h_), reference_fes(reference_fes_), graph(graph_)
 {
     // Build A_ref
-    BuildARef();
+    BuildARef(a);
 
     // Build A matrix
     BuildA(graph.GetDofGroups(), graph.GetBrokenToTrueDofMap());
 }
 
-void VoxelGraphOperator::BuildARef()
+void VoxelGraphOperator::BuildARef(BilinearForm &a)
 {
-    DiffusionIntegrator integ1;
-    MassIntegrator integ2;
+    Array<BilinearFormIntegrator*> domain_integs = *a.GetDBFI();
 
     IsoparametricTransformation T;
     T.SetIdentityTransformation(reference_fes.GetMesh()->GetTypicalElementGeometry());
@@ -24,11 +23,15 @@ void VoxelGraphOperator::BuildARef()
     auto &PM = T.GetPointMat();
     PM *= h;
 
-    integ1.AssembleElementMatrix(*reference_fes.GetTypicalFE(), T, A_ref);
+    A_ref.SetSize(reference_fes.GetFE(0)->GetDof(), reference_fes.GetFE(0)->GetDof());
+    A_ref = 0.0;
 
-    DenseMatrix A_ref_2;
-    integ2.AssembleElementMatrix(*reference_fes.GetTypicalFE(), T, A_ref_2);
-    A_ref += A_ref_2;
+    for (BilinearFormIntegrator *integ : domain_integs)
+    {
+        DenseMatrix A_temp;
+        integ->AssembleElementMatrix(*reference_fes.GetTypicalFE(), T, A_temp);
+        A_ref += A_temp;
+    }
 }
 
 void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
