@@ -13,6 +13,15 @@ VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
     BuildA(graph.GetDofGroups(), graph.GetBrokenToTrueDofMap());
 }
 
+VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
+                                       VoxelGraph &graph_,
+                                       VoxelGraphOperator &fine_operator,
+                                       SparseMatrix &P)
+                                       : reference_fes(reference_fes_), graph(graph_)
+{
+    BuildA(graph.GetDofGroups(), graph.GetBrokenToTrueDofMap(), fine_operator, P);
+}
+
 void VoxelGraphOperator::BuildARef(BilinearForm &a)
 {
     Array<BilinearFormIntegrator*> domain_integs = *a.GetDBFI();
@@ -75,3 +84,54 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
 
     // TODO: Eliminate boundary dofs from coarse operator
 }
+
+void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
+                                const std::vector<int> &broken_to_true_dof,
+                                VoxelGraphOperator &fine_operator,
+                                SparseMatrix &P)
+{
+    // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
+    // true dof j, and 0 otherwise.
+
+    const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
+    const int ne = graph.Size();
+    const int nbdofs = dofs_per_elem * ne;
+    const int ntdofs = dof_groups.size();
+
+    SparseMatrix Lambda(nbdofs, ntdofs);
+    for (int bdof = 0; bdof < nbdofs; ++bdof)
+    {
+        int tdof = broken_to_true_dof[bdof];
+        Lambda.Set(bdof, tdof, 1.0);
+    }
+
+    // Build hat{A} matrix.
+    A_hat = SparseMatrix(nbdofs, nbdofs);
+
+    for (int e = 0; e < ne; ++e)
+    {
+        Array<int> coarse_indices(dofs_per_elem);
+        for (int i = 0; i < dofs_per_elem; ++i)
+        {
+            coarse_indices[i] = e * dofs_per_elem + i;
+        }
+        set<int> contained_fine_elements = fine_operator.graph.GetCoarseToFineElementsMap()[e];
+        for (int fe : contained_fine_elements)
+        {
+            
+        }
+
+        A_hat.AddSubMatrix(coarse_indices, coarse_indices, A_ref);
+    }
+
+    // Finalize matrices before RAP operation
+    Lambda.Finalize();
+    A_hat.Finalize();
+
+    // Compute A = Lambda^T * hat{A} * Lambda
+    std::unique_ptr<SparseMatrix> A_ptr(RAP(Lambda, A_hat, Lambda));
+    A.Swap(*A_ptr);
+
+    // TODO: Eliminate boundary dofs from coarse operator
+}
+

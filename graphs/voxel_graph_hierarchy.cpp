@@ -20,8 +20,8 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     for (int i = nlevels - 2; i >= 0; --i)
     {
         graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph());
-        graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], 2.0 * h, a);
         prolongations[i] = make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i + 1]));
+        graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], *graph_operators[i+1], prolongations[i]);
     }
 }
 
