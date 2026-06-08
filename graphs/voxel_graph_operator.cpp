@@ -53,7 +53,7 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
     }
 
     // Build hat{A} matrix.
-    SparseMatrix A_hat(nbdofs, nbdofs);
+    A_hat = SparseMatrix(nbdofs, nbdofs);
 
     for (int e = 0; e < ne; ++e)
     {
@@ -68,7 +68,6 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
     // Finalize matrices before RAP operation
     Lambda.Finalize();
     A_hat.Finalize();
-    A_hat_ptr = std::make_unique<SparseMatrix>(std::move(A_hat));
 
     // Compute A = Lambda^T * hat{A} * Lambda
     std::unique_ptr<SparseMatrix> A_ptr(RAP(Lambda, A_hat, Lambda));

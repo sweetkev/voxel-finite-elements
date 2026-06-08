@@ -10,7 +10,7 @@ public:
 
     SparseMatrix &GetMatrix() { return A; }
 
-    SparseMatrix &GetAHat() { return *A_hat_ptr; }
+    SparseMatrix &GetAHat() { return A_hat; }
 
 private:
     real_t h;
@@ -19,7 +19,7 @@ private:
     FiniteElementSpace &reference_fes;
 
     SparseMatrix A;
-    std::unique_ptr<SparseMatrix> A_hat_ptr;
+    SparseMatrix A_hat;
 
     VoxelGraph &graph;
 
