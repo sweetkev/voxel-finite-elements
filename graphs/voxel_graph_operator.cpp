@@ -43,7 +43,7 @@ void VoxelGraphOperator::BuildARef(BilinearForm &a)
     }
 }
 
-void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
+void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
                                 const std::vector<int> &broken_to_true_dof)
 {
     // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
@@ -54,7 +54,7 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
     const int nbdofs = dofs_per_elem * ne;
     const int ntdofs = dof_groups.size();
 
-    SparseMatrix Lambda(nbdofs, ntdofs);
+    Lambda = SparseMatrix(nbdofs, ntdofs);
     for (int bdof = 0; bdof < nbdofs; ++bdof)
     {
         int tdof = broken_to_true_dof[bdof];
@@ -85,7 +85,7 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
     // TODO: Eliminate boundary dofs from coarse operator
 }
 
-void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
+void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
                                 const std::vector<int> &broken_to_true_dof,
                                 VoxelGraphOperator &fine_operator,
                                 SparseMatrix &P)
@@ -98,7 +98,7 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
     const int nbdofs = dofs_per_elem * ne;
     const int ntdofs = dof_groups.size();
 
-    SparseMatrix Lambda(nbdofs, ntdofs);
+    Lambda = SparseMatrix(nbdofs, ntdofs);
     for (int bdof = 0; bdof < nbdofs; ++bdof)
     {
         int tdof = broken_to_true_dof[bdof];
@@ -115,13 +115,48 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> dof_groups,
         {
             coarse_indices[i] = e * dofs_per_elem + i;
         }
-        set<int> contained_fine_elements = fine_operator.graph.GetCoarseToFineElementsMap()[e];
+
+        // This map is not yet initialized. This needs to be fixed in graph construction.
+        const std::set<int> &contained_fine_elements = graph.GetCoarseToFineElementsMap()[e];
+        Array<int> fine_broken_dofs(dofs_per_elem * contained_fine_elements.size());
+        int idx = 0;
         for (int fe : contained_fine_elements)
         {
-            
+            for (int i = 0; i < dofs_per_elem; ++i)
+            {
+                fine_broken_dofs[idx++] = fe * dofs_per_elem + i;
+            }
         }
 
-        A_hat.AddSubMatrix(coarse_indices, coarse_indices, A_ref);
+        std::vector<int> fine_broken_to_true_dof = fine_operator.GetGraph().GetBrokenToTrueDofMap();
+        Array<int> fine_true_dofs;
+        for (int i = 0; i < fine_broken_dofs.Size(); ++i)
+        {
+            fine_true_dofs.Append(fine_broken_to_true_dof[fine_broken_dofs[i]]);
+        }
+
+        Array<int> coarse_true_dofs;
+        for (int i = 0; i < dofs_per_elem; ++i)
+        {
+            int coarse_broken_dof = e * dofs_per_elem + i;
+            coarse_true_dofs.Append(broken_to_true_dof[coarse_broken_dof]);
+        }
+
+        DenseMatrix local_A_hat(fine_broken_dofs.Size(), fine_broken_dofs.Size());
+        fine_operator.GetAHat().GetSubMatrix(fine_broken_dofs, fine_broken_dofs, local_A_hat);
+
+        DenseMatrix local_Lambda(fine_broken_dofs.Size(), fine_true_dofs.Size());
+        fine_operator.GetLambda().GetSubMatrix(fine_broken_dofs, fine_true_dofs, local_Lambda);
+
+        DenseMatrix local_P(fine_true_dofs.Size(), coarse_true_dofs.Size());
+        P.GetSubMatrix(fine_true_dofs, coarse_true_dofs, local_P);
+
+        DenseMatrix temp;
+        DenseMatrix A_e;
+        RAP(local_A_hat, local_Lambda, temp);
+        RAP(local_P, temp, A_e);
+
+        A_hat.AddSubMatrix(coarse_indices, coarse_indices, A_e);
     }
 
     // Finalize matrices before RAP operation

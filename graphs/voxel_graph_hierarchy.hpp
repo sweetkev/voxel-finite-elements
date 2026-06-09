@@ -15,12 +15,12 @@ public:
                         BilinearForm &a);
 
     vector<unique_ptr<VoxelGraphOperator>> &GetGraphOperators() { return graph_operators; }
-    vector<unique_ptr<Operator>> &GetProlongations() { return prolongations; }
+    vector<unique_ptr<SparseMatrix>> &GetProlongations() { return prolongations; }
 
 private:
     vector<unique_ptr<VoxelGraph>> graphs;
     vector<unique_ptr<VoxelGraphOperator>> graph_operators;
-    vector<unique_ptr<Operator>> prolongations;
+    vector<unique_ptr<SparseMatrix>> prolongations;
 
     FiniteElementSpace &reference_fes;
     DenseTensor local_prolongation;

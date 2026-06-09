@@ -16,6 +16,10 @@ public:
 
     SparseMatrix &GetAHat() { return A_hat; }
 
+    SparseMatrix &GetLambda() { return Lambda; }
+
+    VoxelGraph &GetGraph() { return graph; }
+
 private:
     real_t h;
 
@@ -24,6 +28,7 @@ private:
 
     SparseMatrix A;
     SparseMatrix A_hat;
+    SparseMatrix Lambda;
 
     VoxelGraph &graph;
 
@@ -35,7 +40,7 @@ private:
     // hat{A} is the block diagonal matrix with blocks corresponding to the
     // local element matrix A_ref, and Lambda is the boolean matrix mapping
     // broken dofs to the true dofs.
-    void BuildA(const std::vector<std::set<int>> dof_groups, 
+    void BuildA(const std::vector<std::set<int>> &dof_groups, 
                 const std::vector<int> &broken_to_true_dof);
 
     // Builds the matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
@@ -44,7 +49,7 @@ private:
     // finer level via 
     // A_e = (P_e)^T * (fine_Lambda_e)^T * fine_A_hat * fine_Lambda_e * P_e 
     // Lambda is the boolean matrix mapping broken dofs to the true dofs. 
-    void BuildA(const std::vector<std::set<int>> dof_groups, 
+    void BuildA(const std::vector<std::set<int>> &dof_groups, 
                 const std::vector<int> &broken_to_true_dof,
                 VoxelGraphOperator &fine_operator,
                 SparseMatrix &P);
