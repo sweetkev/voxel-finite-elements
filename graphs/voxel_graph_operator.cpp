@@ -116,15 +116,13 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
             coarse_indices[i] = e * dofs_per_elem + i;
         }
 
-        // This map is not yet initialized. This needs to be fixed in graph construction.
-        const std::set<int> &contained_fine_elements = graph.GetCoarseToFineElementsMap()[e];
-        Array<int> fine_broken_dofs(dofs_per_elem * contained_fine_elements.size());
-        int idx = 0;
+        const std::set<int> &contained_fine_elements = fine_operator.GetGraph().GetCoarseToFineElementsMap()[e];
+        Array<int> fine_broken_dofs;
         for (int fe : contained_fine_elements)
         {
             for (int i = 0; i < dofs_per_elem; ++i)
             {
-                fine_broken_dofs[idx++] = fe * dofs_per_elem + i;
+                fine_broken_dofs.Append(fe * dofs_per_elem + i);
             }
         }
 
@@ -132,14 +130,26 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
         Array<int> fine_true_dofs;
         for (int i = 0; i < fine_broken_dofs.Size(); ++i)
         {
-            fine_true_dofs.Append(fine_broken_to_true_dof[fine_broken_dofs[i]]);
+            int fine_true_dof = fine_broken_to_true_dof[fine_broken_dofs[i]];
+            bool found = false;
+            for (int tdof : fine_true_dofs)
+            {
+                if (tdof == fine_true_dof) { found = true; break; }
+            }
+            if (!found) { fine_true_dofs.Append(fine_true_dof); }
         }
 
         Array<int> coarse_true_dofs;
         for (int i = 0; i < dofs_per_elem; ++i)
         {
             int coarse_broken_dof = e * dofs_per_elem + i;
-            coarse_true_dofs.Append(broken_to_true_dof[coarse_broken_dof]);
+            int coarse_true_dof = broken_to_true_dof[coarse_broken_dof];
+            bool found = false;
+            for (int tdof : coarse_true_dofs)
+            {
+                if(tdof == coarse_true_dof) { found = true; break; }
+            }
+            if (!found) { coarse_true_dofs.Append(coarse_true_dof); }
         }
 
         DenseMatrix local_A_hat(fine_broken_dofs.Size(), fine_broken_dofs.Size());
@@ -154,7 +164,7 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
         DenseMatrix temp;
         DenseMatrix A_e;
         RAP(local_A_hat, local_Lambda, temp);
-        RAP(local_P, temp, A_e);
+        RAP(temp, local_P, A_e);
 
         A_hat.AddSubMatrix(coarse_indices, coarse_indices, A_e);
     }
