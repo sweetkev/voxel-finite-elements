@@ -18,15 +18,16 @@ SRCS := \
 	graph_solver.cpp \
 	$(SRC_DIR)/meshing/ppm.cpp \
 	$(SRC_DIR)/meshing/pixel_mesh.cpp \
-    $(SRC_DIR)/graphs/graph.cpp \
-	$(SRC_DIR)/graphs/graph_operator.cpp
+    $(SRC_DIR)/graphs/voxel_graph.cpp \
+	$(SRC_DIR)/graphs/voxel_graph_operator.cpp \
+	$(SRC_DIR)/graphs/voxel_graph_hierarchy.cpp
 
 OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 DEPS := $(OBJS:.o=.d)
 
 INCLUDES := $(MFEM_INCFLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
-CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP -g
+CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP
 
 
 all: dirichlet_2d graph_solver

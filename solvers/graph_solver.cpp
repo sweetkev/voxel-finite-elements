@@ -1,8 +1,9 @@
 #include "mfem.hpp"
 #include "ppm.hpp"
 #include "pixel_mesh.hpp"
-#include "graph.hpp"
-#include "graph_operator.hpp"
+#include "voxel_graph.hpp"
+#include "voxel_graph_operator.hpp"
+#include "voxel_graph_hierarchy.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -53,38 +54,10 @@ int main(int argc, char *argv[])
     if(nlevels < 0) {
       int width = mesh.GetWidth();
       int height = mesh.GetHeight();
-      
+
       // Find the number of coarsenings until height or width is 1
       nlevels = max(ceil(log2(width)), ceil(log2(height)));
       cout << "new nlevels: " << nlevels << "\n";
-    }
-
-    //create reference mesh and compute local prolongation
-    Mesh reference_element = Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL);
-    H1_FECollection single_fec(order, reference_element.Dimension());
-    FiniteElementSpace single_fes(&reference_element, &single_fec);
-
-    reference_element.UniformRefinement();
-    single_fes.Update();
-
-    const Geometry::Type geom = Geometry::SQUARE;
-
-    const CoarseFineTransformations &rtrans = reference_element.GetRefinementTransforms();
-    const DenseTensor &pmats = rtrans.point_matrices[geom];
-    const int nmat = pmats.SizeK();
-
-    const FiniteElement *fe = single_fes.GetFE(0);
-    const int ldof = fe->GetDof();
-
-    IsoparametricTransformation isotr;
-    isotr.SetIdentityTransformation(geom);
-
-    DenseTensor local_prolongation(ldof, ldof, nmat);
-
-    for (int i = 0; i < nmat; i++)
-    {
-        isotr.SetPointMat(pmats(i));
-        fe->GetLocalInterpolation(isotr, local_prolongation(i));
     }
 
     //create reference mesh for fespace
@@ -94,27 +67,10 @@ int main(int argc, char *argv[])
 
     const real_t h = mesh.GetMesh().GetElementSize(0, 0);
 
-    // Create multigrid hierarchy using graph operators
-    vector<unique_ptr<GraphOperator>> graph_operators(nlevels);
-
-    // Create fine graph operator
-    Graph fine_graph(fes, image);
-    graph_operators[nlevels-1] = make_unique<GraphOperator>(reference_fes,
-                                                              fine_graph,
-                                                              h);
-
-    // Create coarser levels
-    int width = mesh.GetWidth();
-    int height = mesh.GetHeight();
-    cout << "initial dimensions: " << width << " x " << height << "\n";
-    for (int level = nlevels-2; level >= 0; --level)
-    {
-        graph_operators[level] = make_unique<GraphOperator>(
-            graph_operators[level+1]->Coarsen());
-        width = width / 2;
-        height = height / 2;
-        cout << "new dimensions: " << width << " x " << height << "\n";
-    }
+    // Create multigrid hierarchy
+    VoxelGraphHierarchy graph_hierarchy(
+        make_unique<VoxelGraph>(fes, image, reference_fes),
+        nlevels, reference_fes, h, a);
 
     // Create multigrid hierarchy
     Array<Operator*> operators(nlevels);
@@ -128,12 +84,17 @@ int main(int argc, char *argv[])
     own_smoothers = true;
     own_prolongations = false;
 
+    for (int level = 0; level < nlevels - 1; ++level)
+    {
+        prolongations[level] = graph_hierarchy.GetProlongations()[level].get();
+    }
+
     // Set operators and smoothers for each level
     for (int level = 0; level < nlevels; level++)
     {
-        SparseMatrix *A = &graph_operators[level]->GetMatrix();
+        SparseMatrix *A = &graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
         operators[level] = A;
-        
+
         if (level == 0)
         {
             // Coarsest level: direct solver
@@ -146,20 +107,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Create prolongation operators between levels
-    for (int level = 0; level < nlevels - 1; level++)
-    {
-        SparseMatrix *P = new SparseMatrix(
-            graph_operators[level]->CreateProlongation(
-                local_prolongation,
-                graph_operators[level+1]->GetGraph(),
-                graph_operators[level+1]->GetBrokenToTrueDofMap(),
-                graph_operators[level+1]->GetDofGroups(),
-                graph_operators[level]->GetGraph().GetGraphLabeling()));
-        prolongations[level] = P;
-        own_prolongations[level] = true;
-    }
-
 
     Multigrid mg(operators, smoothers, prolongations, own_operators,
                  own_smoothers, own_prolongations);
@@ -169,7 +116,7 @@ int main(int argc, char *argv[])
     cg.SetRelTol(1e-12);
     cg.SetMaxIter(2000);
     cg.SetPrintLevel(1);
-    cg.SetOperator(graph_operators[nlevels-1]->GetMatrix());
+    cg.SetOperator(graph_hierarchy.GetGraphOperators()[nlevels-1]->GetMatrix());
     cg.SetPreconditioner(mg);
     cg.Mult(B, X);
 
