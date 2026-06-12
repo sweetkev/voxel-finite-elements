@@ -90,4 +90,7 @@ private:
     // to the local dof number e_dof on element e. If the dof is not shared
     // between elements, returns -1
     int GetNeighborDof(int e, int e_dof, int neighbor);
+
+    // Reindex DOFs to match MFEM's labeling.
+    void ReindexDofs(const FiniteElementSpace &fes);
 };

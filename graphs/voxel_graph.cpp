@@ -51,7 +51,6 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, 
    Mult(element_to_dof, *dof_to_element, new_graph);
    graph = RemoveSelfConnections(new_graph);
 
-
    // Create maps between coordinates and vertices
    const int width = image_.Width();
    const int height = image_.Height();
@@ -73,6 +72,8 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, 
 
    CreateReferenceDofMap();
    CreateDofGroups();
+
+   ReindexDofs(fes);
 }
 
 VoxelGraph VoxelGraph::CoarsenGraph()
@@ -362,4 +363,34 @@ int VoxelGraph::GetNeighborDof(int e, int e_dof, int neighbor)
         neighbor_ref_element += (neighbor_coord[i] - e_coord[i] + 1) * pow(3, i);
     }
     return local_to_neighbor_dof_map(e_dof, neighbor_ref_element);
+}
+
+
+void VoxelGraph::ReindexDofs(const FiniteElementSpace &fes)
+{
+    int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
+    int ntdofs = dof_groups.size();
+    int ne = graph.Size();
+    int nbdofs = dofs_per_elem * ne;
+    vector<set<int>> new_dof_groups(ntdofs);
+    vector<int> voxel_to_mfem(ntdofs);
+    for (int mfem_dof = 0; mfem_dof < ntdofs; ++mfem_dof)
+    {
+        int e = fes.GetElementForDof(mfem_dof);
+        int local_mfem_index = fes.GetLocalDofForDof(mfem_dof);
+        int broken_dof = e * dofs_per_elem + local_mfem_index;
+        int voxel_dof = broken_to_true_dof[broken_dof];
+        voxel_to_mfem[voxel_dof] = mfem_dof;
+
+        set<int> dof_group = dof_groups[voxel_dof];
+        new_dof_groups[mfem_dof] = dof_groups[voxel_dof];
+    }
+    dof_groups = new_dof_groups;
+
+    for (int bdof = 0; bdof < nbdofs; ++bdof)
+    {
+        int voxel_dof = broken_to_true_dof[bdof];
+        int mfem_dof = voxel_to_mfem[voxel_dof];
+        broken_to_true_dof[bdof] = mfem_dof;
+    }
 }

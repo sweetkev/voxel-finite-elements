@@ -10,7 +10,7 @@ using namespace std;
 class VoxelGraphHierarchy
 {
 public:
-    VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, int nlevels,
+    VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, Array<int> &fine_ess_dofs, int nlevels,
                         FiniteElementSpace &reference_fes, real_t h,
                         BilinearForm &a);
 
@@ -19,8 +19,10 @@ public:
 
 private:
     vector<unique_ptr<VoxelGraph>> graphs;
-    vector<unique_ptr<VoxelGraphOperator>> graph_operators;
+    vector<Array<int>> ess_dofs;
     vector<unique_ptr<SparseMatrix>> prolongations;
+    vector<unique_ptr<VoxelGraphOperator>> graph_operators;
+    
 
     FiniteElementSpace &reference_fes;
     DenseTensor local_prolongation;
@@ -32,7 +34,10 @@ private:
     void CreateLocalProlongation(int dim);
 
     // Builds the prolongation matrix from the coarse space to the fine space.
-    SparseMatrix CreateProlongation(const VoxelGraph &coarse_graph, const VoxelGraph &fine_graph);
+    SparseMatrix CreateProlongation(const VoxelGraph &coarse_graph, 
+                                    const VoxelGraph &fine_graph, 
+                                    Array<int> &coarse_ess_dofs,
+                                    const Array<int> &fine_ess_dofs);
 };
 
 // Builds the mesh which contains all neighbor information for a single element.
