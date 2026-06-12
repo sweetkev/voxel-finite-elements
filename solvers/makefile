@@ -15,7 +15,6 @@ CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
 BUILD_DIR := build
 
 SRCS := \
-	graph_solver.cpp \
 	$(SRC_DIR)/meshing/ppm.cpp \
 	$(SRC_DIR)/meshing/pixel_mesh.cpp \
     $(SRC_DIR)/graphs/voxel_graph.cpp \
@@ -30,13 +29,16 @@ INCLUDES := $(MFEM_INCFLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
 CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP
 
 
-all: dirichlet_2d graph_solver
+all: dirichlet_2d graph_solver graph_solver_dirichlet
 
 dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp
 	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
 
-graph_solver: $(OBJS)
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+graph_solver: graph_solver.cpp $(OBJS)
+	$(MFEM_CXX) $(CXXFLAGS) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+
+graph_solver_dirichlet: graph_solver_dirichlet.cpp $(OBJS)
+	$(MFEM_CXX) $(CXXFLAGS) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
@@ -47,4 +49,4 @@ $(BUILD_DIR)/%.o: %.cpp
 .PHONY: clean
 
 clean:
-	rm -rf $(BUILD_DIR) dirichlet_2d graph_solver
+	rm -rf $(BUILD_DIR) dirichlet_2d graph_solver graph_solver_dirichlet

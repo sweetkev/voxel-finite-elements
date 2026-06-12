@@ -31,11 +31,10 @@ int main(int argc, char *argv[])
     FiniteElementSpace fes(&mesh.GetMesh(), &fec);
 
     Array<int> ess_dofs;
-    // fes.GetBoundaryTrueDofs(ess_dofs);
+    fes.GetBoundaryTrueDofs(ess_dofs);
 
     BilinearForm a(&fes);
     a.AddDomainIntegrator(new DiffusionIntegrator);
-    a.AddDomainIntegrator(new MassIntegrator);
     a.Assemble();
 
     GridFunction x(&fes);
