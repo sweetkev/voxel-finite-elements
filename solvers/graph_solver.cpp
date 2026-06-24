@@ -15,11 +15,14 @@ int main(int argc, char *argv[])
     string pgm_file = "../pgm_files/australia.pgm";
     int nlevels = -1;
     int order = 1;
+    bool dirichlet = true;
 
     OptionsParser args(argc, argv);
     args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
     args.AddOption(&nlevels, "-nl", "--nlevels", "number of multigrid levels");
     args.AddOption(&order, "-o", "--order", "polynomial order");
+    args.AddOption(&dirichlet, "-d", "--dirichlet", "-n", "--neumann",
+                   "Dirichlet or Neumann BCs");
     args.ParseCheck();
 
     //generate fine mesh from pgm file
@@ -31,7 +34,10 @@ int main(int argc, char *argv[])
     FiniteElementSpace fes(&mesh.GetMesh(), &fec);
 
     Array<int> ess_dofs;
-    // fes.GetBoundaryTrueDofs(ess_dofs);
+    if (dirichlet)
+    {
+        fes.GetBoundaryTrueDofs(ess_dofs);
+    }
 
     BilinearForm a(&fes);
     a.AddDomainIntegrator(new DiffusionIntegrator);
@@ -93,6 +99,7 @@ int main(int argc, char *argv[])
     for (int level = 0; level < nlevels; level++)
     {
         SparseMatrix *A = &graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
+        std::cout << "Level " << level << ": " << A->Height() << " DOFs\n";
         operators[level] = A;
 
         if (level == 0)
