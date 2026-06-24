@@ -234,7 +234,7 @@ VoxelGraph::VoxelGraph(Table &graph_, vector<Coord> &grid_cells_,
     : graph(graph_), grid_cells(grid_cells_),
       coord_to_element(coord_to_element_), element_to_coord(element_to_coord_),
       reference_fes(reference_fes_)
-{ 
+{
     CreateReferenceDofMap();
     CreateDofGroups();
 }
@@ -382,7 +382,6 @@ void VoxelGraph::ReindexDofs(const FiniteElementSpace &fes)
         int voxel_dof = broken_to_true_dof[broken_dof];
         voxel_to_mfem[voxel_dof] = mfem_dof;
 
-        set<int> dof_group = dof_groups[voxel_dof];
         new_dof_groups[mfem_dof] = dof_groups[voxel_dof];
     }
     dof_groups = new_dof_groups;
