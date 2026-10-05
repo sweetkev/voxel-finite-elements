@@ -1,0 +1,14 @@
+NRRD0004
+# Complete NRRD file format specification at:
+# http://teem.sourceforge.net/nrrd/format.html
+type: uchar
+endian: little
+encoding: raw
+dimension: 3
+space: 3D-right-handed
+kinds: domain domain domain
+sizes: 400 400 400
+space directions: (5.345,0,0) (0,5.345,0) (0,0,5.345)
+space origin: (0.0,0.0,0.0)
+space units: "µm" "µm" "µm"
+data file: Berea.raw

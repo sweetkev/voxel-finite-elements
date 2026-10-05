@@ -63,6 +63,9 @@ graph_solver
 *.mesh
 *.gf
 
+# Don't ignore voxel_data directory
+!voxel_data/*
+
 # Configuration files
 Make.user
 
