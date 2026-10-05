@@ -34,7 +34,7 @@ all: $(PROGRAMS)
 
 naive_solver: $(BUILD_DIR)/naive_solver.o $(MESH_OBJS) $(MFEM_LIB_FILE)
 
-graph_solver: %: $(BUILD_DIR)/%.o $(MESH_OBJS) $(GRAPH_OBJS) $(MFEM_LIB_FILE)
+graph_solver: $(BUILD_DIR)/graph_solver.o $(MESH_OBJS) $(GRAPH_OBJS) $(MFEM_LIB_FILE)
 
 $(PROGRAMS):
 	$(MFEM_CXX) $(MFEM_FLAGS) $(filter %.o,$^) -o $@ $(MFEM_LIBS)
@@ -52,4 +52,4 @@ $(BUILD_DIR)/%.o: %.cpp
 -include $(wildcard $(BUILD_DIR)/*.d $(BUILD_DIR)/*/*.d)
 
 clean:
-	rm -rf $(BUILD_DIR) $(PROGRAMS) *.d
+	rm -rf $(BUILD_DIR) $(PROGRAMS)
