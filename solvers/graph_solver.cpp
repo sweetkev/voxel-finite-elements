@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     if (nlevels < 0)
     {
         const int n = min(mesh.GetWidth(), mesh.GetHeight());
-        int nlevels = 0;
+        nlevels = 0;
         while (pow(2, nlevels) < n) { ++nlevels; }
 
         // One more level than coarsenings
