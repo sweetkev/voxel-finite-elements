@@ -102,13 +102,13 @@ int main(int argc, char *argv[])
       BilinearForm *coarse_a = new BilinearForm(coarse_fes);
       coarse_a->AddDomainIntegrator(new DiffusionIntegrator);
       coarse_a->Assemble();
+      forms[level].reset(coarse_a);
 
+      // coarse_A points to the matrix owned by coarse_a
       OperatorHandle coarse_A;
       coarse_a->FormSystemMatrix(*coarse_ess_dofs, coarse_A);
-      coarse_A.SetOperatorOwner(false);
 
       operators[level] = coarse_A.Ptr();
-      own_operators[level] = true;
 
       if (level == 0)
       {

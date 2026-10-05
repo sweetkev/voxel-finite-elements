@@ -3,7 +3,25 @@
 #include "voxel_graph.hpp"
 #include "voxel_graph_operator.hpp"
 
+void EliminateProlongationEssentialDOFs(SparseMatrix &P,
+                                        const Array<int> &coarse_ess_dofs,
+                                        const Array<int> &fine_ess_dofs)
+{
+    for (const int f : fine_ess_dofs)
+    {
+        P.EliminateRow(f, Operator::DIAG_ZERO);
+    }
+    Array<int> coarse_ess_marker(P.Width());
+    coarse_ess_marker = 0;
+    for (int c : coarse_ess_dofs)
+    {
+        coarse_ess_marker[c] = 1;
+    }
+    P.EliminateCols(coarse_ess_marker);
+}
+
 VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
+                    Array<int> &fine_ess_dofs,
                     int nlevels,
                     FiniteElementSpace &reference_fes_,
                     real_t h_, BilinearForm &a)
@@ -12,16 +30,31 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
 
     graphs.resize(nlevels);
-    graph_operators.resize(nlevels);
+    ess_dofs.resize(nlevels);
     prolongations.resize(nlevels - 1);
+    graph_operators.resize(nlevels);
 
     graphs[nlevels - 1] = std::move(fine_graph);
+    ess_dofs[nlevels - 1] = fine_ess_dofs;
     graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h, a);
+    // Eliminate BCs from the finest level operator.
+    for (const int ess_dof : fine_ess_dofs)
+    {
+        graph_operators[nlevels - 1]->GetMatrix().EliminateRowCol(ess_dof, Operator::DIAG_ONE);
+    }
+
     for (int i = nlevels - 2; i >= 0; --i)
     {
         graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph());
-        prolongations[i] = make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i + 1]));
+        prolongations[i] = make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i+1], ess_dofs[i], ess_dofs[i+1]));
         graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], *graph_operators[i+1], *prolongations[i]);
+
+        // Eliminate BCs from the operator and the prolongation matrix.
+        for (const int ess_dof : ess_dofs[i])
+        {
+            graph_operators[i]->GetMatrix().EliminateRowCol(ess_dof, Operator::DIAG_ONE);
+        }
+        EliminateProlongationEssentialDOFs(*prolongations[i], ess_dofs[i], ess_dofs[i+1]);
     }
 }
 
@@ -66,7 +99,9 @@ void VoxelGraphHierarchy::CreateLocalProlongation(int dim)
 }
 
 SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_graph,
-                                        const VoxelGraph &fine_graph)
+                                        const VoxelGraph &fine_graph,
+                                        Array<int> &coarse_ess_dofs,
+                                        const Array<int> &fine_ess_dofs)
 {
     static constexpr int map_from_lex[4] = {0, 1, 3, 2};
 
@@ -111,10 +146,30 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
         }
         P.SetSubMatrix(rows, cols, local_prolongation(local_prolongation_index));
     }
-
-    // TODO: Handle boundary dofs in P
-
     P.Finalize();
+
+    // Identify the coarse essential DOFs: a DOF is a coarse essential DOF if it
+    // has a nonzero contribution to any fine essential DOF.
+    coarse_ess_dofs.DeleteAll();
+    if(!fine_ess_dofs.IsEmpty())
+    {
+        vector<bool> coarse_ess_dof_added(num_coarse_dofs, false);
+        for (int ess_dof : fine_ess_dofs)
+        {
+            Array<int> cols;
+            Vector row;
+            P.GetRow(ess_dof, cols, row);
+            for (int i = 0; i < cols.Size(); ++i)
+            {
+                const int col = cols[i];
+                if(abs(row[i]) > 1e-12 && !coarse_ess_dof_added[col])
+                {
+                    coarse_ess_dofs.Append(col);
+                    coarse_ess_dof_added[col] = true;
+                }
+            }
+        }
+    }
 
     return P;
 }

@@ -15,11 +15,14 @@ int main(int argc, char *argv[])
     string pgm_file = "../pgm_files/australia.pgm";
     int nlevels = -1;
     int order = 1;
+    bool dirichlet = true;
 
     OptionsParser args(argc, argv);
     args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
     args.AddOption(&nlevels, "-nl", "--nlevels", "number of multigrid levels");
     args.AddOption(&order, "-o", "--order", "polynomial order");
+    args.AddOption(&dirichlet, "-d", "--dirichlet", "-n", "--neumann",
+                   "Dirichlet or Neumann BCs");
     args.ParseCheck();
 
     //generate fine mesh from pgm file
@@ -31,7 +34,10 @@ int main(int argc, char *argv[])
     FiniteElementSpace fes(&mesh.GetMesh(), &fec);
 
     Array<int> ess_dofs;
-    // fes.GetBoundaryTrueDofs(ess_dofs);
+    if (dirichlet)
+    {
+        fes.GetBoundaryTrueDofs(ess_dofs);
+    }
 
     BilinearForm a(&fes);
     a.AddDomainIntegrator(new DiffusionIntegrator);
@@ -51,13 +57,16 @@ int main(int argc, char *argv[])
     a.FormLinearSystem(ess_dofs, x, b, A, X, B);
 
     // If nlevels was not specified, coarsen until smallest dimension is 1
-    if(nlevels < 0) {
-      int width = mesh.GetWidth();
-      int height = mesh.GetHeight();
+    if (nlevels < 0)
+    {
+        const int n = min(mesh.GetWidth(), mesh.GetHeight());
+        int nlevels = 0;
+        while (pow(2, nlevels) < n) { ++nlevels; }
 
-      // Find the number of coarsenings until height or width is 1
-      nlevels = max(ceil(log2(width)), ceil(log2(height)));
-      cout << "new nlevels: " << nlevels << "\n";
+        // One more level than coarsenings
+        nlevels += 1;
+        
+        cout << "new nlevels: " << nlevels << "\n";
     }
 
     //create reference mesh for fespace
@@ -69,10 +78,9 @@ int main(int argc, char *argv[])
 
     // Create multigrid hierarchy
     VoxelGraphHierarchy graph_hierarchy(
-        make_unique<VoxelGraph>(fes, image, reference_fes),
+        make_unique<VoxelGraph>(fes, image, reference_fes), ess_dofs,
         nlevels, reference_fes, h, a);
 
-    // Create multigrid hierarchy
     Array<Operator*> operators(nlevels);
     Array<Solver*> smoothers(nlevels);
     Array<Operator*> prolongations(nlevels - 1);
@@ -93,6 +101,7 @@ int main(int argc, char *argv[])
     for (int level = 0; level < nlevels; level++)
     {
         SparseMatrix *A = &graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
+        std::cout << "Level " << level << ": " << A->Height() << " DOFs\n";
         operators[level] = A;
 
         if (level == 0)
