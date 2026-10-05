@@ -57,13 +57,16 @@ int main(int argc, char *argv[])
     a.FormLinearSystem(ess_dofs, x, b, A, X, B);
 
     // If nlevels was not specified, coarsen until smallest dimension is 1
-    if(nlevels < 0) {
-      int width = mesh.GetWidth();
-      int height = mesh.GetHeight();
+    if (nlevels < 0)
+    {
+        const int n = min(mesh.GetWidth(), mesh.GetHeight());
+        int nlevels = 0;
+        while (pow(2, nlevels) < n) { ++nlevels; }
 
-      // Find the number of coarsenings until height or width is 1
-      nlevels = max(ceil(log2(width)), ceil(log2(height)));
-      cout << "new nlevels: " << nlevels << "\n";
+        // One more level than coarsenings
+        nlevels += 1;
+        
+        cout << "new nlevels: " << nlevels << "\n";
     }
 
     //create reference mesh for fespace
@@ -78,7 +81,6 @@ int main(int argc, char *argv[])
         make_unique<VoxelGraph>(fes, image, reference_fes), ess_dofs,
         nlevels, reference_fes, h, a);
 
-    // Create multigrid hierarchy
     Array<Operator*> operators(nlevels);
     Array<Solver*> smoothers(nlevels);
     Array<Operator*> prolongations(nlevels - 1);
