@@ -6,7 +6,7 @@ m_values = isempty(ARGS) ? collect(3:12) : [parse(Int, x) for x in ARGS]
 nlevels = 4
 src_pgm = joinpath("..", "pgm_files", "snake.pgm")
 mksnake = joinpath("..", "pgm_files", "mksnake.jl")
-dirichlet_exe = joinpath(".", "dirichlet_2d")
+naive_exe = joinpath(".", "naive_solver")
 graph_exe = joinpath(".", "graph_solver")
 
 function run_and_capture(cmd::Cmd)
@@ -36,7 +36,7 @@ function ensure_executable(path::String, source::String)
     end
 end
 
-ensure_executable(dirichlet_exe, "dirichlet_2d.cpp")
+ensure_executable(naive_exe, "naive_solver.cpp")
 ensure_executable(graph_exe, "graph_solver.cpp")
 
 f = open("snake_test.tex"; write=true)
@@ -53,16 +53,16 @@ for m in m_values
     println("\nGenerating mesh for m=$m, n=2^m=$n -> $meshfile")
     run(`julia $(mksnake) $(n) $(meshfile)`)
 
-    dir_output = run_and_capture(`$(dirichlet_exe) -f $(meshfile) --nlevels $(nlevels)`)
+    naive_output = run_and_capture(`$(naive_exe) -f $(meshfile) --nlevels $(nlevels)`)
     graph_output = run_and_capture(`$(graph_exe) -f $(meshfile) --nlevels $(nlevels)`)
 
-    dir_iter = parse_cg_iterations(dir_output)
+    naive_iter = parse_cg_iterations(naive_output)
     graph_iter = parse_cg_iterations(graph_output)
 
-    dir_str = dir_iter === missing ? "?" : string(dir_iter)
+    naive_str = naive_iter === missing ? "?" : string(naive_iter)
     graph_str = graph_iter === missing ? "?" : string(graph_iter)
 
-    println(f,"\$2^{$(m)}\$ & $(dir_str) & $(graph_str) \\\\")
+    println(f,"\$2^{$(m)}\$ & $(naive_str) & $(graph_str) \\\\")
 end
 println(f,"\\hline")
 println(f,"\\end{tabular}")

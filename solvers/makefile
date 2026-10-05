@@ -8,45 +8,48 @@ ifndef SRC_DIR
 $(error SRC_DIR is not set)
 endif
 
-MFEM_BUILD_DIR = $(MFEM_DIR)
-CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
--include $(CONFIG_MK)
+include $(MFEM_DIR)/config/config.mk
 
 BUILD_DIR := build
 
-SRCS := \
-	$(SRC_DIR)/meshing/ppm.cpp \
-	$(SRC_DIR)/meshing/pixel_mesh.cpp \
-    $(SRC_DIR)/graphs/voxel_graph.cpp \
-	$(SRC_DIR)/graphs/voxel_graph_operator.cpp \
-	$(SRC_DIR)/graphs/voxel_graph_hierarchy.cpp
+MESH_SRCS := \
+	meshing/ppm.cpp \
+	meshing/pixel_mesh.cpp
 
-OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+GRAPH_SRCS := \
+	graphs/voxel_graph.cpp \
+	graphs/voxel_graph_operator.cpp \
+	graphs/voxel_graph_hierarchy.cpp
 
-DEPS := $(OBJS:.o=.d)
+MESH_OBJS := $(MESH_SRCS:%.cpp=$(BUILD_DIR)/%.o)
+GRAPH_OBJS := $(GRAPH_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-INCLUDES := $(MFEM_INCFLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs
-CXXFLAGS := $(MFEM_CXXFLAGS) $(INCLUDES) -MMD -MP
+PROGRAMS := naive_solver graph_solver
 
+CXXFLAGS := $(MFEM_FLAGS) -I$(SRC_DIR)/meshing -I$(SRC_DIR)/graphs -MMD -MP
 
-all: dirichlet_2d graph_solver graph_solver_dirichlet
+.PHONY: all clean
 
-dirichlet_2d: dirichlet_2d.cpp $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp
-	$(MFEM_CXX) $(MFEM_CXXFLAGS) $(MFEM_INCFLAGS) $< $(SRC_DIR)/meshing/ppm.cpp $(SRC_DIR)/meshing/pixel_mesh.cpp -o $@ -L$(MFEM_DIR) $(MFEM_LIBS) -I$(SRC_DIR)/meshing
+all: $(PROGRAMS)
 
-graph_solver: graph_solver.cpp $(OBJS)
-	$(MFEM_CXX) $(CXXFLAGS) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+naive_solver: $(BUILD_DIR)/naive_solver.o $(MESH_OBJS) $(MFEM_LIB_FILE)
 
-graph_solver_dirichlet: graph_solver_dirichlet.cpp $(OBJS)
-	$(MFEM_CXX) $(CXXFLAGS) $^ -o $@ -L$(MFEM_DIR) $(MFEM_LIBS)
+graph_solver: %: $(BUILD_DIR)/%.o $(MESH_OBJS) $(GRAPH_OBJS) $(MFEM_LIB_FILE)
 
+$(PROGRAMS):
+	$(MFEM_CXX) $(MFEM_FLAGS) $(filter %.o,$^) -o $@ $(MFEM_LIBS)
+
+# library sources from SRC_DIR
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
+	$(MFEM_CXX) $(CXXFLAGS) -c $< -o $@
+
+# solver drivers in this directory
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(MFEM_CXX) $(CXXFLAGS) -c $< -o $@
 
--include $(DEPS)
-
-.PHONY: clean
+-include $(wildcard $(BUILD_DIR)/*.d $(BUILD_DIR)/*/*.d)
 
 clean:
-	rm -rf $(BUILD_DIR) dirichlet_2d graph_solver graph_solver_dirichlet
+	rm -rf $(BUILD_DIR) $(PROGRAMS) *.d

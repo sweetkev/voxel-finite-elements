@@ -34,9 +34,8 @@ build/
 *.exe
 *.out
 *.app
-dirichlet_2d
+naive_solver
 graph_solver
-graph_solver_dirichlet
 
 *.dSYM
 
