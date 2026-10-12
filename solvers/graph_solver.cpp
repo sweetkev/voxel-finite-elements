@@ -12,13 +12,15 @@ int main(int argc, char *argv[])
 {
 
     //parse options
-    string pgm_file = "../pgm_files/australia.pgm";
+    string file = "../pgm_files/australia.pgm";
     int nlevels = -1;
     int order = 1;
     bool dirichlet = true;
+    string mesh_file = "";
 
     OptionsParser args(argc, argv);
-    args.AddOption(&pgm_file, "-f", "--file", "pgm file to use");
+    args.AddOption(&file, "-f", "--file", "image file to use");
+    args.AddOption(&mesh_file, "-m", "--mesh", "mesh file to use instead of image");
     args.AddOption(&nlevels, "-nl", "--nlevels", "number of multigrid levels");
     args.AddOption(&order, "-o", "--order", "polynomial order");
     args.AddOption(&dirichlet, "-d", "--dirichlet", "-n", "--neumann",
@@ -26,8 +28,18 @@ int main(int argc, char *argv[])
     args.ParseCheck();
 
     //generate fine mesh from pgm file
-    PixelImage image(pgm_file);
+    PixelImage image(file);
     PixelMesh mesh(image);
+
+    // if (mesh_file == "")
+    // {
+    //     PixelImage image(file);
+    //     PixelMesh mesh(image);
+    // }
+    // else 
+    // {
+    //     // use mesh file
+    // }
 
     //set up problem
     H1_FECollection fec(order, mesh.Dimension());
