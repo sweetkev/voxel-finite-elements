@@ -29,7 +29,10 @@ int main(int argc, char *argv[])
 
     //generate fine mesh from pgm file
     PixelImage image(file);
-    PixelMesh mesh(image);
+    PixelMesh pmesh(image);
+    Mesh &mesh = pmesh.GetMesh();
+
+    const real_t h = mesh.GetElementSize(0, 0);
 
     // if (mesh_file == "")
     // {
@@ -43,7 +46,7 @@ int main(int argc, char *argv[])
 
     //set up problem
     H1_FECollection fec(order, mesh.Dimension());
-    FiniteElementSpace fes(&mesh.GetMesh(), &fec);
+    FiniteElementSpace fes(&mesh, &fec);
 
     Array<int> ess_dofs;
     if (dirichlet)
@@ -71,10 +74,15 @@ int main(int argc, char *argv[])
     // If nlevels was not specified, coarsen until smallest dimension is 1
     if (nlevels < 0)
     {
-        const int n = min(mesh.GetWidth(), mesh.GetHeight());
+        Vector bb_min;
+        Vector bb_max;
+        mesh.GetBoundingBox(bb_min, bb_max, 0);
+        Vector lengths(bb_max);
+        lengths -= bb_min;
+        real_t n = lengths.Min() / h;
+
         nlevels = 0;
         while (pow(2, nlevels) < n) { ++nlevels; }
-
         // One more level than coarsenings
         nlevels += 1;
         
@@ -82,11 +90,9 @@ int main(int argc, char *argv[])
     }
 
     //create reference mesh for fespace
-    Mesh reference_mesh = CreateReferenceMesh(mesh.GetMesh().Dimension());
+    Mesh reference_mesh = CreateReferenceMesh(mesh.Dimension());
     H1_FECollection reference_fec(order, reference_mesh.Dimension());
     FiniteElementSpace reference_fes(&reference_mesh, &reference_fec);
-
-    const real_t h = mesh.GetMesh().GetElementSize(0, 0);
 
     // Create multigrid hierarchy
     VoxelGraphHierarchy graph_hierarchy(
@@ -143,5 +149,5 @@ int main(int argc, char *argv[])
 
     a.RecoverFEMSolution(X,b,x);
     x.Save("sol.gf");
-    mesh.GetMesh().Save("mesh.mesh");
+    mesh.Save("mesh.mesh");
 }
