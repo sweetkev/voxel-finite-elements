@@ -122,12 +122,12 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
         const int coarse_e = fine_to_coarse_element_map[fine_e];
         if (coarse_e < 0) { continue; }
 
-        Coord coarse_coord = coarse_graph.GetElementCoord(coarse_e);
-        Coord fine_coord = fine_graph.GetElementCoord(fine_e);
+        CellIndex coarse_cell = coarse_graph.GetElementCell(coarse_e);
+        CellIndex fine_cell = fine_graph.GetElementCell(fine_e);
 
         // TODO: Generalize to n-dimensions. Currently assumes 2D.
-        const int dx = fine_coord[0] - 2 * coarse_coord[0];
-        const int dy = fine_coord[1] - 2 * coarse_coord[1];
+        const int dx = fine_cell[0] - 2 * coarse_cell[0];
+        const int dy = fine_cell[1] - 2 * coarse_cell[1];
         if (dx < 0 || dx > 1 || dy < 0 || dy > 1) { MFEM_ABORT(""); }
 
         const int local_prolongation_index = map_from_lex[dx + 2 * dy];
