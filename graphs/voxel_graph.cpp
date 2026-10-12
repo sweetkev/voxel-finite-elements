@@ -41,7 +41,7 @@ Table RemoveSelfConnections(Table &graph)
 }
 }
 
-VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, const FiniteElementSpace &reference_fes_)
+VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image, const FiniteElementSpace &reference_fes_)
     : reference_fes(reference_fes_)
 {
    // Element-to-element table is (element-to-dof) * (dof-to-element)
@@ -52,14 +52,14 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, 
    graph = RemoveSelfConnections(new_graph);
 
    // Create maps between grid cells and elements
-   const int width = image_.Width();
-   const int height = image_.Height();
+   const int width = image.Width();
+   const int height = image.Height();
    int e = 0;
    for (int j = 0; j < height; ++j)
    {
       for (int i = 0; i < width; ++i)
       {
-         if (image_(i, j) != 0)
+         if (image(i, j) != 0)
          {
             CellIndex cell(i, j);
             cell_to_elements[cell].push_back(e);
