@@ -44,10 +44,8 @@ public:
 
     const vector<int>& GetCellDims() const { return cell_dims; }
 
-    // Returns true if cell (i,j) is shaded.
-    bool operator()(int i, int j) const;
-    // Returns true if cell (i,j,k) is shaded.
-    bool operator()(int i, int j, int k) const;
+    // Returns true if cell (i,j,k) is shaded. k=0 for 2D images
+    bool operator()(int i, int j, int k=0) const;
     // Returns true if cell i is shaded. 
     bool operator[](int i) const;
 

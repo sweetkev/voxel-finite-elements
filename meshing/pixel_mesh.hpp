@@ -2,33 +2,13 @@
 
 #include "ppm.hpp"
 #include "mfem.hpp"
+#include "voxel_image.hpp"
 #include <iostream>
 #include <array>
 #include <unordered_map>
 #include <tuple>
 
 using namespace mfem;
-
-struct CellIndex
-{
-   std::array<int,2> ijk{};
-   CellIndex() = default;
-   CellIndex(int i, int j) : ijk({i, j}) { }
-   int &operator[](int i) { return ijk[i]; }
-   int operator[](int i) const { return ijk[i]; }
-   bool operator==(const CellIndex &other) const
-      { return ijk[0] == other[0] && ijk[1] == other[1]; }
-   bool operator!=(const CellIndex &other) const
-      { return ijk[0] != other[0] || ijk[1] != other[1]; }
-};
-
-template<> struct std::hash<CellIndex>
-{
-   std::size_t operator()(const CellIndex &c) const noexcept
-   {
-      return c[0]^(c[1] + 0x9e3779b9 + (c[0]<<6) + (c[0]>>2));
-   }
-};
 
 class PixelMesh
 {

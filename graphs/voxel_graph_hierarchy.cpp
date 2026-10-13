@@ -103,7 +103,8 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
                                         Array<int> &coarse_ess_dofs,
                                         const Array<int> &fine_ess_dofs)
 {
-    static constexpr int map_from_lex[4] = {0, 1, 3, 2};
+    // The first 4 entries are the quad ordering; all 8 are the hex ordering.
+    static constexpr int map_from_lex[8] = {0, 1, 3, 2, 4, 5, 7, 6};
 
     const vector<set<int>> &coarse_dof_groups = coarse_graph.GetDofGroups();
     const vector<int> &coarse_broken_to_true_dof = coarse_graph.GetBrokenToTrueDofMap();
@@ -125,12 +126,11 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
         CellIndex coarse_cell = coarse_graph.GetElementCell(coarse_e);
         CellIndex fine_cell = fine_graph.GetElementCell(fine_e);
 
-        // TODO: Generalize to n-dimensions. Currently assumes 2D.
         const int dx = fine_cell[0] - 2 * coarse_cell[0];
         const int dy = fine_cell[1] - 2 * coarse_cell[1];
-        if (dx < 0 || dx > 1 || dy < 0 || dy > 1) { MFEM_ABORT(""); }
+        const int dz = fine_cell[2] - 2 * coarse_cell[2];
 
-        const int local_prolongation_index = map_from_lex[dx + 2 * dy];
+        const int local_prolongation_index = map_from_lex[dx + 2*dy + 4*dz];
 
         Array<int> rows(dofs_per_elem);
         Array<int> cols(dofs_per_elem);

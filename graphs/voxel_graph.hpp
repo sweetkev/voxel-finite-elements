@@ -1,8 +1,7 @@
 #pragma once
 
+#include "voxel_image.hpp"
 #include "mfem.hpp"
-#include "ppm.hpp"
-#include "pixel_mesh.hpp"
 #include <unordered_map>
 
 using namespace mfem;
@@ -14,7 +13,7 @@ public:
     // Create a graph where each vertex of the graph corresponds to an occupied
     // pixel/voxel in the image, and edges are created using vertex adjacency
     // of the pixels/voxels. 
-    VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, const FiniteElementSpace &reference_fes);
+    VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image_, const FiniteElementSpace &reference_fes);
 
     // Returns the graph over a coarsened mesh. Each grid cell of the coarse
     // mesh is obtained by coarsening a 2x2(x2) block of grid cells in the fine

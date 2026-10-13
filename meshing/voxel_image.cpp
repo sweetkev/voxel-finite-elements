@@ -27,17 +27,8 @@ Mesh VoxelImage::MakeMesh() {
     }
 }
 
-bool VoxelImage::operator()(int i, int j) const
-{
-   MFEM_ASSERT(cell_dims.size() == 2, "2D access on a non-2D image");
-   MFEM_ASSERT(0 <= i && i < cell_dims[0] && 0 <= j && j < cell_dims[1],
-               "cell index out of range");
-   return data[i + cell_dims[0]*j];
-}
-
 bool VoxelImage::operator()(int i, int j, int k) const
 {
-   MFEM_ASSERT(cell_dims.size() == 3, "3D access on a non-3D image");
    MFEM_ASSERT(0 <= i && i < cell_dims[0] && 0 <= j && j < cell_dims[1] &&
                0 <= k && k < cell_dims[2], "cell index out of range");
    return data[i + cell_dims[0]*(j + cell_dims[1]*k)];
@@ -73,7 +64,7 @@ void ReadComments(istream &in)
 }
 
 Mesh VoxelImage::ReadPgm() {
-    cell_dims.resize(2);
+    cell_dims.resize(3,1);
 
     ifstream in(file);
     if (!in.good())

@@ -1,7 +1,6 @@
 #include "voxel_graph.hpp"
 #include "mfem.hpp"
-#include "ppm.hpp"
-#include "pixel_mesh.hpp"
+#include "voxel_image.hpp"
 #include <unordered_map>
 
 using namespace mfem;
@@ -41,7 +40,7 @@ Table RemoveSelfConnections(Table &graph)
 }
 }
 
-VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image, const FiniteElementSpace &reference_fes_)
+VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image, const FiniteElementSpace &reference_fes_)
     : reference_fes(reference_fes_)
 {
    // Element-to-element table is (element-to-dof) * (dof-to-element)
@@ -52,20 +51,22 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image, c
    graph = RemoveSelfConnections(new_graph);
 
    // Create maps between grid cells and elements
-   const int width = image.Width();
-   const int height = image.Height();
+   const vector<int> &dims = image.GetCellDims();
    int e = 0;
-   for (int j = 0; j < height; ++j)
+   for (int k = 0; k < dims[2]; ++k)
    {
-      for (int i = 0; i < width; ++i)
+      for (int j = 0; j < dims[1]; ++j)
       {
-         if (image(i, j) != 0)
+         for (int i = 0; i < dims[0]; ++i)
          {
-            CellIndex cell(i, j);
-            cell_to_elements[cell].push_back(e);
-            element_to_cell.push_back(cell);
-            grid_cells.push_back(cell);
-            ++e;
+            if (image(i,j,k))
+            {
+               CellIndex cell(i, j, k);
+               cell_to_elements[cell].push_back(e);
+               element_to_cell.push_back(cell);
+               grid_cells.push_back(cell);
+               ++e;
+            }
          }
       }
    }
@@ -90,7 +91,7 @@ VoxelGraph VoxelGraph::CoarsenGraph()
     // Find coarse grid cells
     for (CellIndex fine_cell : grid_cells)
     {
-        CellIndex coarse_cell(fine_cell[0]/2, fine_cell[1]/2);
+        CellIndex coarse_cell(fine_cell[0]/2, fine_cell[1]/2, fine_cell[2]/2);
 
         // Only add each coarse grid cell to list once
         const auto coarse_cell_visited = find(coarse_grid_cells.begin(),
