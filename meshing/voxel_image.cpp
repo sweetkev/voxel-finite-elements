@@ -3,14 +3,81 @@
 #include "mfem.hpp"
 #include <iostream>
 #include <unordered_map>
+#include <unordered_set>
 #include <tuple>
+#include <limits>
 
 using namespace mfem;
 using namespace std;
 
 VoxelImage::VoxelImage(string file_) : file(file_) {}
 
+VoxelImage::VoxelImage(const Mesh &mesh_) : input_mesh(new Mesh(mesh_))
+{
+   const Mesh &mesh = *input_mesh;
+   const int dim = mesh.Dimension();
+   const int ne = mesh.GetNE();
+
+   // Lower corner of each element's bounding box, and its extent
+   auto ElementBox = [&](int e, array<real_t,3> &lo, array<real_t,3> &hi)
+   {
+      Array<int> v;
+      mesh.GetElementVertices(e, v);
+      lo.fill(numeric_limits<real_t>::max());
+      hi.fill(numeric_limits<real_t>::lowest());
+      for (int iv : v)
+      {
+         const real_t *x = mesh.GetVertex(iv);
+         for (int d = 0; d < dim; ++d)
+         {
+            lo[d] = min(lo[d], x[d]);
+            hi[d] = max(hi[d], x[d]);
+         }
+      }
+   };
+
+   // Cell size is taken from the first element
+   array<real_t,3> lo, hi, h;
+   ElementBox(0, lo, hi);
+   for (int d = 0; d < dim; ++d)
+   {
+      h[d] = hi[d] - lo[d];
+   }
+
+   // Grid origin is the lower corner of the mesh's bounding box
+   array<real_t,3> origin;
+   origin.fill(numeric_limits<real_t>::max());
+   for (int iv = 0; iv < mesh.GetNV(); ++iv)
+   {
+      const real_t *x = mesh.GetVertex(iv);
+      for (int d = 0; d < dim; ++d)
+      {
+         origin[d] = min(origin[d], x[d]);
+      }
+   }
+
+   // Place each element in its grid cell
+   const real_t tol = 1e-8;
+   unordered_set<CellIndex> occupied;
+   element_to_cell.resize(ne);
+   for (int e = 0; e < ne; ++e)
+   {
+      ElementBox(e, lo, hi);
+      CellIndex cell;
+      for (int d = 0; d < dim; ++d)
+      {
+         const real_t s = (lo[d] - origin[d]) / h[d];
+         cell[d] = (int)round(s);
+      }
+      element_to_cell[e] = cell;
+   }
+}
+
 Mesh VoxelImage::MakeMesh() {
+    if (input_mesh) {
+        return Mesh(*input_mesh);
+    }
+
     string file_type = GetFileType();
 
     if (file_type == "pgm") {
@@ -25,19 +92,6 @@ Mesh VoxelImage::MakeMesh() {
     else {
         MFEM_ABORT("Unsupported file type");
     }
-}
-
-bool VoxelImage::operator()(int i, int j, int k) const
-{
-   MFEM_ASSERT(0 <= i && i < cell_dims[0] && 0 <= j && j < cell_dims[1] &&
-               0 <= k && k < cell_dims[2], "cell index out of range");
-   return data[i + cell_dims[0]*(j + cell_dims[1]*k)];
-}
-
-bool VoxelImage::operator[](int i) const
-{
-   MFEM_ASSERT(0 <= i && i < (int)data.size(), "cell index out of range");
-   return data[i];
 }
 
 
@@ -64,7 +118,7 @@ void ReadComments(istream &in)
 }
 
 Mesh VoxelImage::ReadPgm() {
-    cell_dims.resize(3,1);
+    vector<int> cell_dims(2);
 
     ifstream in(file);
     if (!in.good())
@@ -94,7 +148,7 @@ Mesh VoxelImage::ReadPgm() {
 
     // Read pgm
     const int n = cell_dims[0]*cell_dims[1];
-    data.assign(n, false);
+    vector<bool> data(n, false);
 
     int value;
     for (int i = 0; i < n; ++i)
@@ -131,18 +185,21 @@ Mesh VoxelImage::ReadPgm() {
     }
 
     // Add the elements.
+    element_to_cell.clear();
+    element_to_cell.reserve(ne);
     int e = 0;
     for (int j = 0; j < cell_dims[1]; ++j)
     {
         for (int i = 0; i < cell_dims[0]; ++i)
         {
-            if (operator()(i,j))
+            if (data[i + cell_dims[0]*j])
             {
                 const int v1 = j*(cell_dims[0] + 1) + i;
                 const int v2 = v1 + 1;
                 const int v3 = v1 + cell_dims[0] + 1 + 1;
                 const int v4 = v3 - 1;
                 mesh.AddQuad(v1, v2, v3, v4);
+                element_to_cell.push_back(CellIndex(i, j));
                 e++;
             }
         }
@@ -234,7 +291,7 @@ Mesh VoxelImage::ReadNrrd()
    string directions = header["space directions"];
 
    vector<int> vert_dims(dim);
-   cell_dims.resize(dim);
+   vector<int> cell_dims(dim);
    {
       istringstream s(sizes_str);
       for (int d = 0; d < dim; ++d)
@@ -266,7 +323,6 @@ Mesh VoxelImage::ReadNrrd()
 
    int total_cells = 1;
    for (int d = 0; d < dim; ++d) { total_cells *= cell_dims[d]; }
-   data.assign(total_cells, false);
    int total_verts = 1;
    for (int d = 0; d < dim; ++d) { total_verts *= vert_dims[d]; }
 
@@ -294,7 +350,6 @@ Mesh VoxelImage::ReadNrrd()
    {
       if (cells[i] != 0)
       {
-         data[i] = true;
          lex2cell[i] = cell_i;
          cell2lex.push_back(i);
          ++cell_i;
@@ -330,8 +385,17 @@ Mesh VoxelImage::ReadNrrd()
       mesh.AddVertex(coords.data());
    }
 
+   element_to_cell.clear();
+   element_to_cell.reserve(cell_i);
    for (int i = 0; i < cell_i; ++i)
    {
+      {
+         const auto cell_cart = cell_idx.CartesianIndex(cell2lex[i]);
+         CellIndex cell;
+         for (int d = 0; d < dim; ++d) { cell[d] = cell_cart[d]; }
+         element_to_cell.push_back(cell);
+      }
+
       if (dim == 2)
       {
          MFEM_ABORT("");

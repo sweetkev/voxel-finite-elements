@@ -51,24 +51,13 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image, c
    graph = RemoveSelfConnections(new_graph);
 
    // Create maps between grid cells and elements
-   const vector<int> &dims = image.GetCellDims();
-   int e = 0;
-   for (int k = 0; k < dims[2]; ++k)
+   element_to_cell = image.GetElementToCell();
+   for (int e = 0; e < (int)element_to_cell.size(); ++e)
    {
-      for (int j = 0; j < dims[1]; ++j)
-      {
-         for (int i = 0; i < dims[0]; ++i)
-         {
-            if (image(i,j,k))
-            {
-               CellIndex cell(i, j, k);
-               cell_to_elements[cell].push_back(e);
-               element_to_cell.push_back(cell);
-               grid_cells.push_back(cell);
-               ++e;
-            }
-         }
-      }
+      const CellIndex &cell = element_to_cell[e];
+      vector<int> &elements = cell_to_elements[cell];
+      if (elements.empty()) { grid_cells.push_back(cell); }
+      elements.push_back(e);
    }
 
    CreateReferenceDofMap();

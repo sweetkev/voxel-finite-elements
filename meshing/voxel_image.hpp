@@ -4,6 +4,7 @@
 #include "mfem.hpp"
 #include <iostream>
 #include <array>
+#include <memory>
 #include <unordered_map>
 #include <tuple>
 
@@ -37,25 +38,23 @@ class VoxelImage
 {
 public:
 
+    // Create mesh structure from image file.
     VoxelImage(string file_);
-    // TODO: VoxelImage (Mesh mesh);
+    // Create structure for graph operations from mesh file.
+    VoxelImage(const Mesh &mesh_);
 
+    // Returns the mesh read from the image file, or a copy of the input mesh.
     Mesh MakeMesh();
 
-    const vector<int>& GetCellDims() const { return cell_dims; }
-
-    // Returns true if cell (i,j,k) is shaded. k=0 for 2D images
-    bool operator()(int i, int j, int k=0) const;
-    // Returns true if cell i is shaded. 
-    bool operator[](int i) const;
+    // Returns map from element numbers to grid cell indices.
+    const vector<CellIndex>& GetElementToCell() const { return element_to_cell; }
 
 private:
     string file;
+    unique_ptr<Mesh> input_mesh; // Set only when constructed from a mesh
 
-    vector<int> cell_dims;
+    vector<CellIndex> element_to_cell;
 
-    vector<bool> data;
-    
     string GetFileType();
     Mesh ReadPgm();
     Mesh ReadNrrd();

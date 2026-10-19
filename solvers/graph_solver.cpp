@@ -26,9 +26,17 @@ int main(int argc, char *argv[])
                    "Dirichlet or Neumann BCs");
     args.ParseCheck();
 
-    // Generate fine mesh from image file
-    // TODO: add support for inputting a mesh file
-    VoxelImage image(file);
+    // Generate fine mesh from image or mesh file
+    unique_ptr<VoxelImage> image_ptr;
+    if (mesh_file.empty())
+    {
+        image_ptr = make_unique<VoxelImage>(file);
+    }
+    else
+    {
+        image_ptr = make_unique<VoxelImage>(Mesh(mesh_file));
+    }
+    VoxelImage &image = *image_ptr;
     Mesh mesh = image.MakeMesh();
 
     const real_t h = mesh.GetElementSize(0, 0);
