@@ -1,0 +1,13 @@
+NRRD0004
+# Complete NRRD file format specification at:
+# http://teem.sourceforge.net/nrrd/format.html
+type: uchar
+endian: little
+encoding: raw
+dimension: 3
+space: 3D-right-handed
+kinds: domain domain domain
+sizes: 11 11 11
+space directions: (1,0,0) (0,1,0) (0,0,1)
+space origin: (0.0,0.0,0.0)
+data file: spacefilling.raw
