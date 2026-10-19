@@ -14,7 +14,8 @@ BUILD_DIR := build
 
 MESH_SRCS := \
 	meshing/ppm.cpp \
-	meshing/pixel_mesh.cpp
+	meshing/pixel_mesh.cpp \
+	meshing/voxel_image.cpp
 
 GRAPH_SRCS := \
 	graphs/voxel_graph.cpp \

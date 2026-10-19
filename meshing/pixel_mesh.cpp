@@ -39,7 +39,7 @@ PixelMesh::PixelMesh(const PixelImage &image_) : image(image_)
    }
 
    // Add the elements.
-   element_to_coord.resize(width*height);
+   element_to_cell.resize(width*height);
    int e = 0;
    for (int j = 0; j < height; ++j)
    {
@@ -47,9 +47,9 @@ PixelMesh::PixelMesh(const PixelImage &image_) : image(image_)
       {
          if (image(i, j) != 0)
          {
-            Coord coord(i, j);
-            coord_to_element[coord] = e;
-            element_to_coord[e] = coord;
+            CellIndex cell(i, j);
+            cell_to_element[cell] = e;
+            element_to_cell[e] = cell;
 
             const int v1 = j*(width + 1) + i;
             const int v2 = v1 + 1;
@@ -110,24 +110,24 @@ SparseMatrix CreatePixelProlongation(const PixelMesh &coarse_mesh,
    {
       children_offsets[i] = offset;
 
-      const Coord coarse_coord = coarse_mesh.GetElementCoord(i);
-      Coord fine_coord(2*coarse_coord[0], 2*coarse_coord[1]);
+      const CellIndex coarse_cell = coarse_mesh.GetElementCell(i);
+      CellIndex fine_cell(2*coarse_cell[0], 2*coarse_cell[1]);
 
       for (int jj = 0; jj < 2; ++jj)
       {
-         fine_coord[1] += jj;
+         fine_cell[1] += jj;
          for (int ii = 0; ii < 2; ++ii)
          {
-            fine_coord[0] += ii;
-            const int fine_idx = fine_mesh.GetElementIndex(fine_coord);
+            fine_cell[0] += ii;
+            const int fine_idx = fine_mesh.GetElementIndex(fine_cell);
             if (fine_idx >= 0)
             {
                children[offset] = {fine_idx, ii + 2*jj};
                ++offset;
             }
-            fine_coord[0] -= ii;
+            fine_cell[0] -= ii;
          }
-         fine_coord[1] -= jj;
+         fine_cell[1] -= jj;
       }
    }
    children_offsets.back() = offset;

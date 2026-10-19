@@ -1,6 +1,5 @@
 #include "mfem.hpp"
-#include "ppm.hpp"
-#include "pixel_mesh.hpp"
+#include "voxel_image.hpp"
 #include "voxel_graph.hpp"
 #include "voxel_graph_operator.hpp"
 #include "voxel_graph_hierarchy.hpp"
@@ -11,7 +10,7 @@ using namespace std;
 int main(int argc, char *argv[])
 {
 
-    //parse options
+    // Parse options
     string file = "../pgm_files/australia.pgm";
     int nlevels = -1;
     int order = 1;
@@ -27,22 +26,20 @@ int main(int argc, char *argv[])
                    "Dirichlet or Neumann BCs");
     args.ParseCheck();
 
-    //generate fine mesh from pgm file
-    PixelImage image(file);
-    PixelMesh pmesh(image);
-    Mesh &mesh = pmesh.GetMesh();
+    // Generate fine mesh from image or mesh file
+    unique_ptr<VoxelImage> image_ptr;
+    if (mesh_file.empty())
+    {
+        image_ptr = make_unique<VoxelImage>(file);
+    }
+    else
+    {
+        image_ptr = make_unique<VoxelImage>(Mesh(mesh_file));
+    }
+    VoxelImage &image = *image_ptr;
+    Mesh mesh = image.MakeMesh();
 
     const real_t h = mesh.GetElementSize(0, 0);
-
-    // if (mesh_file == "")
-    // {
-    //     PixelImage image(file);
-    //     PixelMesh mesh(image);
-    // }
-    // else 
-    // {
-    //     // use mesh file
-    // }
 
     //set up problem
     H1_FECollection fec(order, mesh.Dimension());

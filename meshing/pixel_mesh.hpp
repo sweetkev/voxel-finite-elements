@@ -2,33 +2,13 @@
 
 #include "ppm.hpp"
 #include "mfem.hpp"
+#include "voxel_image.hpp"
 #include <iostream>
 #include <array>
 #include <unordered_map>
 #include <tuple>
 
 using namespace mfem;
-
-struct Coord
-{
-   std::array<int,2> coords{};
-   Coord() = default;
-   Coord(int i, int j) : coords({i, j}) { }
-   int &operator[](int i) { return coords[i]; }
-   int operator[](int i) const { return coords[i]; }
-   bool operator==(const Coord &other) const
-      { return coords[0] == other[0] && coords[1] == other[1]; }
-   bool operator!=(const Coord &other) const
-      { return coords[0] != other[0] || coords[1] != other[1]; }
-};
-
-template<> struct std::hash<Coord>
-{
-   std::size_t operator()(const Coord &c) const noexcept
-   {
-      return c[0]^(c[1] + 0x9e3779b9 + (c[0]<<6) + (c[0]>>2));
-   }
-};
 
 class PixelMesh
 {
@@ -55,17 +35,16 @@ public:
    /** Returns mesh height */
    const int GetHeight() const { return height; }
 
-   /** Returns the bottom-left coordinates of element i */
-   Coord GetElementCoord(int i) const { return element_to_coord[i]; }
+   /** Returns the grid cell of element i */
+   CellIndex GetElementCell(int i) const { return element_to_cell[i]; }
 
    /**
-    * Returns the element index of the element with bottom-left
-    *  coordinates coord
+    * Returns the index of the element in the given grid cell
     */
-   int GetElementIndex(Coord coord) const
+   int GetElementIndex(CellIndex cell) const
    {
-      auto it = coord_to_element.find(coord);
-      if (it != coord_to_element.end())
+      auto it = cell_to_element.find(cell);
+      if (it != cell_to_element.end())
       {
          return it->second;
       }
@@ -79,8 +58,8 @@ private:
    PixelImage image;
 
    Mesh mesh;
-   std::unordered_map<Coord, int> coord_to_element;
-   std::vector<Coord> element_to_coord;
+   std::unordered_map<CellIndex, int> cell_to_element;
+   std::vector<CellIndex> element_to_cell;
 
    int width = -1;
    int height = -1;

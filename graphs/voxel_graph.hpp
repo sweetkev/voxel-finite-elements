@@ -1,8 +1,7 @@
 #pragma once
 
+#include "voxel_image.hpp"
 #include "mfem.hpp"
-#include "ppm.hpp"
-#include "pixel_mesh.hpp"
 #include <unordered_map>
 
 using namespace mfem;
@@ -14,7 +13,7 @@ public:
     // Create a graph where each vertex of the graph corresponds to an occupied
     // pixel/voxel in the image, and edges are created using vertex adjacency
     // of the pixels/voxels. 
-    VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, const FiniteElementSpace &reference_fes);
+    VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image_, const FiniteElementSpace &reference_fes);
 
     // Returns the graph over a coarsened mesh. Each grid cell of the coarse
     // mesh is obtained by coarsening a 2x2(x2) block of grid cells in the fine
@@ -39,18 +38,18 @@ public:
         return coarse_to_fine_elements_map;
     }
 
-    const Coord &GetElementCoord(int e) const { return element_to_coord[e]; }
+    const CellIndex &GetElementCell(int e) const { return element_to_cell[e]; }
 
     int Size() const { return graph.Size(); }
 
 private:
     // Graph structure
     Table graph;
-    vector<Coord> grid_cells; // Occupied grid cells
+    vector<CellIndex> grid_cells; // Occupied grid cells
 
-    // Maps between coordinates and elements
-    unordered_map<Coord, vector<int>> coord_to_element;
-    vector<Coord> element_to_coord;
+    // Maps between grid cells and elements
+    unordered_map<CellIndex, vector<int>> cell_to_elements;
+    vector<CellIndex> element_to_cell;
 
     // Fine-to-coarse element map. This is the "labeling" of each fine element
     // that determines which coarse element it belongs to.
@@ -73,9 +72,9 @@ private:
     // the central reference element.
     DenseMatrix local_to_neighbor_dof_map;    
 
-    VoxelGraph(Table &graph, vector<Coord> &grid_cells,
-               unordered_map<Coord, vector<int>> &coord_to_element,
-               vector<Coord> &element_to_coord, 
+    VoxelGraph(Table &graph, vector<CellIndex> &grid_cells,
+               unordered_map<CellIndex, vector<int>> &cell_to_elements,
+               vector<CellIndex> &element_to_cell, 
                const FiniteElementSpace &reference_fes);
 
     // Creates the matrix whose ith row represents a local dof number

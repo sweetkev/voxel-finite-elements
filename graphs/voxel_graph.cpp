@@ -1,7 +1,6 @@
 #include "voxel_graph.hpp"
 #include "mfem.hpp"
-#include "ppm.hpp"
-#include "pixel_mesh.hpp"
+#include "voxel_image.hpp"
 #include <unordered_map>
 
 using namespace mfem;
@@ -41,7 +40,7 @@ Table RemoveSelfConnections(Table &graph)
 }
 }
 
-VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, const FiniteElementSpace &reference_fes_)
+VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image, const FiniteElementSpace &reference_fes_)
     : reference_fes(reference_fes_)
 {
    // Element-to-element table is (element-to-dof) * (dof-to-element)
@@ -51,23 +50,14 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, 
    Mult(element_to_dof, *dof_to_element, new_graph);
    graph = RemoveSelfConnections(new_graph);
 
-   // Create maps between coordinates and vertices
-   const int width = image_.Width();
-   const int height = image_.Height();
-   int e = 0;
-   for (int j = 0; j < height; ++j)
+   // Create maps between grid cells and elements
+   element_to_cell = image.GetElementToCell();
+   for (int e = 0; e < (int)element_to_cell.size(); ++e)
    {
-      for (int i = 0; i < width; ++i)
-      {
-         if (image_(i, j) != 0)
-         {
-            Coord coord(i, j);
-            coord_to_element[coord].push_back(e);
-            element_to_coord.push_back(coord);
-            grid_cells.push_back(coord);
-            ++e;
-         }
-      }
+      const CellIndex &cell = element_to_cell[e];
+      vector<int> &elements = cell_to_elements[cell];
+      if (elements.empty()) { grid_cells.push_back(cell); }
+      elements.push_back(e);
    }
 
    CreateReferenceDofMap();
@@ -79,33 +69,33 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const PixelImage &image_, 
 VoxelGraph VoxelGraph::CoarsenGraph()
 {
     // Initialize coarse graph maps
-    vector<Coord> coarse_grid_cells;
-    unordered_map<Coord, vector<int>> coarse_coord_to_element;
-    vector<Coord> coarse_element_to_coord;
+    vector<CellIndex> coarse_grid_cells;
+    unordered_map<CellIndex, vector<int>> coarse_cell_to_elements;
+    vector<CellIndex> coarse_element_to_cell;
 
     // Initialize maps between coarse grid cells and fine elements
-    vector<Coord> fine_element_to_coarse_coord(graph.Size());
-    unordered_map<Coord, vector<int>> coarse_coord_to_fine_elements;
+    vector<CellIndex> fine_element_to_coarse_cell(graph.Size());
+    unordered_map<CellIndex, vector<int>> coarse_cell_to_fine_elements;
 
     // Find coarse grid cells
-    for (Coord fine_coord : grid_cells)
+    for (CellIndex fine_cell : grid_cells)
     {
-        Coord coarse_coord(fine_coord[0]/2, fine_coord[1]/2);
+        CellIndex coarse_cell(fine_cell[0]/2, fine_cell[1]/2, fine_cell[2]/2);
 
         // Only add each coarse grid cell to list once
-        const auto coarse_coord_visited = find(coarse_grid_cells.begin(),
-                                               coarse_grid_cells.end(),
-                                               coarse_coord);
-        if (coarse_coord_visited == coarse_grid_cells.end())
+        const auto coarse_cell_visited = find(coarse_grid_cells.begin(),
+                                              coarse_grid_cells.end(),
+                                              coarse_cell);
+        if (coarse_cell_visited == coarse_grid_cells.end())
         {
-            coarse_grid_cells.push_back(coarse_coord);
+            coarse_grid_cells.push_back(coarse_cell);
         }
 
         // Create maps between the coarse grid cells and fine elements
-        for (int fine_element : coord_to_element[fine_coord])
+        for (int fine_element : cell_to_elements[fine_cell])
         {
-            fine_element_to_coarse_coord[fine_element] = coarse_coord;
-            coarse_coord_to_fine_elements[coarse_coord].push_back(fine_element);
+            fine_element_to_coarse_cell[fine_element] = coarse_cell;
+            coarse_cell_to_fine_elements[coarse_cell].push_back(fine_element);
         }
     }
 
@@ -114,9 +104,9 @@ VoxelGraph VoxelGraph::CoarsenGraph()
     // finding the connected components of the fine graph over each coarse grid
     // cell. Each connected component recieves a distinct label.
     int coarse_element_counter = 0;
-    for (Coord coarse_coord : coarse_grid_cells)
+    for (CellIndex coarse_cell : coarse_grid_cells)
     {
-        const vector<int> &fine_elements = coarse_coord_to_fine_elements[coarse_coord];
+        const vector<int> &fine_elements = coarse_cell_to_fine_elements[coarse_cell];
         const int fine_ne = fine_elements.size();
         vector<set<int>> connected_components(fine_ne);
         unordered_map<int,int> fine_element_component_index(fine_ne);
@@ -148,7 +138,7 @@ VoxelGraph VoxelGraph::CoarsenGraph()
             graph.GetRow(fine_element, row);
             for (int neighbor_fine_element : row)
             {
-                if (fine_element_to_coarse_coord[neighbor_fine_element] != coarse_coord)
+                if (fine_element_to_coarse_cell[neighbor_fine_element] != coarse_cell)
                 {
                 continue;
                 }
@@ -164,7 +154,7 @@ VoxelGraph VoxelGraph::CoarsenGraph()
             if (!connected_components[i].empty())
             {
                 nonempty_component_index[i] = nonempty_component_counter;
-                coarse_coord_to_element[coarse_coord].push_back(coarse_element_counter +
+                coarse_cell_to_elements[coarse_cell].push_back(coarse_element_counter +
                                                          nonempty_component_counter);
                 ++nonempty_component_counter;
             }
@@ -185,13 +175,13 @@ VoxelGraph VoxelGraph::CoarsenGraph()
         coarse_element_counter += nonempty_component_counter;
     }
 
-    // Create map between coarse elements and their coordinates
-    coarse_element_to_coord.resize(coarse_element_counter);
-    for (Coord coarse_coord : coarse_grid_cells)
+    // Create map between coarse elements and their grid cells
+    coarse_element_to_cell.resize(coarse_element_counter);
+    for (CellIndex coarse_cell : coarse_grid_cells)
     {
-        for (int coarse_element : coarse_coord_to_element[coarse_coord])
+        for (int coarse_element : coarse_cell_to_elements[coarse_cell])
         {
-            coarse_element_to_coord[coarse_element] = coarse_coord;
+            coarse_element_to_cell[coarse_element] = coarse_cell;
         }
    }
 
@@ -223,16 +213,16 @@ VoxelGraph VoxelGraph::CoarsenGraph()
    // Remove self-adjacencies
    Table coarse_graph = RemoveSelfConnections(coarse_graph_temp2);
 
-   return VoxelGraph(coarse_graph, coarse_grid_cells, coarse_coord_to_element,
-                     coarse_element_to_coord, reference_fes);
+   return VoxelGraph(coarse_graph, coarse_grid_cells, coarse_cell_to_elements,
+                     coarse_element_to_cell, reference_fes);
 }
 
-VoxelGraph::VoxelGraph(Table &graph_, vector<Coord> &grid_cells_,
-                         unordered_map<Coord, vector<int>> &coord_to_element_,
-                         vector<Coord> &element_to_coord_,
+VoxelGraph::VoxelGraph(Table &graph_, vector<CellIndex> &grid_cells_,
+                         unordered_map<CellIndex, vector<int>> &cell_to_elements_,
+                         vector<CellIndex> &element_to_cell_,
                          const FiniteElementSpace &reference_fes_)
     : graph(graph_), grid_cells(grid_cells_),
-      coord_to_element(coord_to_element_), element_to_coord(element_to_coord_),
+      cell_to_elements(cell_to_elements_), element_to_cell(element_to_cell_),
       reference_fes(reference_fes_)
 {
     CreateReferenceDofMap();
@@ -353,14 +343,14 @@ void VoxelGraph::CreateDofGroups()
 
 int VoxelGraph::GetNeighborDof(int e, int e_dof, int neighbor)
 {
-    Coord e_coord = element_to_coord[e];
-    Coord neighbor_coord = element_to_coord[neighbor];
+    CellIndex e_cell = element_to_cell[e];
+    CellIndex neighbor_cell = element_to_cell[neighbor];
 
     int d = reference_fes.GetMesh()->Dimension();
     int neighbor_ref_element = 0;
     for (int i = 0; i < d; ++i)
     {
-        neighbor_ref_element += (neighbor_coord[i] - e_coord[i] + 1) * pow(3, i);
+        neighbor_ref_element += (neighbor_cell[i] - e_cell[i] + 1) * pow(3, i);
     }
     return local_to_neighbor_dof_map(e_dof, neighbor_ref_element);
 }
