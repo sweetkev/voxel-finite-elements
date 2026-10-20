@@ -17,7 +17,7 @@ end
 
 nlines = div(n-width, width + vgap) + 1 # number of folds
 
-# Returns true if pixel (x, y) of the 2D snake pattern is filled
+# Returns true if (x, y) of the 2D snake pattern is filled
 function filled(x, y)
     # Empty space below the final fold
     if y > (nlines-1)*(width + vgap) + width
@@ -28,7 +28,7 @@ function filled(x, y)
     if offset <= width
         return true
     end
-    # Connector between folds, alternating sides
+    
     return ((line % 2 == 1) && (x > n-width)) || ((line % 2 == 0) && (x <= width))
 end
 
