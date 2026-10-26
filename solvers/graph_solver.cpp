@@ -9,6 +9,9 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
+    // Initialize MPI and hypre.
+    Mpi::Init();
+    Hypre::Init();
 
     // Parse options
     string file = "../pgm_files/australia.pgm";
@@ -41,33 +44,6 @@ int main(int argc, char *argv[])
 
     const real_t h = mesh.GetElementSize(0, 0);
 
-    //set up problem
-    H1_FECollection fec(order, mesh.Dimension());
-    FiniteElementSpace fes(&mesh, &fec);
-
-    Array<int> ess_dofs;
-    if (dirichlet)
-    {
-        fes.GetBoundaryTrueDofs(ess_dofs);
-    }
-
-    BilinearForm a(&fes);
-    a.AddDomainIntegrator(new DiffusionIntegrator);
-    a.AddDomainIntegrator(new MassIntegrator);
-    a.Assemble();
-
-    GridFunction x(&fes);
-    x = 0.0;
-
-    ConstantCoefficient one(1.0);
-    LinearForm b(&fes);
-    b.AddDomainIntegrator(new DomainLFIntegrator(one));
-    b.Assemble();
-
-    SparseMatrix A;
-    Vector X, B;
-    a.FormLinearSystem(ess_dofs, x, b, A, X, B);
-
     // If nlevels was not specified, coarsen until smallest dimension is 1
     if (nlevels < 0)
     {
@@ -83,8 +59,37 @@ int main(int argc, char *argv[])
         // One more level than coarsenings
         nlevels += 1;
         
-        cout << "new nlevels: " << nlevels << "\n";
+        if(Mpi::Root()) { cout << "new nlevels: " << nlevels << "\n"; }
     }
+
+    // Set up problem in parallel
+    ParMesh pmesh(MPI_COMM_WORLD, mesh);
+    H1_FECollection fec(order, mesh.Dimension());
+    // FiniteElementSpace fes(&mesh, &fec);
+    ParFiniteElementSpace pfes(&pmesh, &fec);
+
+    Array<int> ess_dofs;
+    if (dirichlet)
+    {
+        pfes.GetBoundaryTrueDofs(ess_dofs);
+    }
+
+    ParBilinearForm a(&pfes);
+    a.AddDomainIntegrator(new DiffusionIntegrator);
+    a.AddDomainIntegrator(new MassIntegrator);
+    a.Assemble();
+
+    ParGridFunction x(&pfes);
+    x = 0.0;
+
+    ConstantCoefficient one(1.0);
+    ParLinearForm b(&pfes);
+    b.AddDomainIntegrator(new DomainLFIntegrator(one));
+    b.Assemble();
+
+    HypreParMatrix A;
+    Vector X, B;
+    a.FormLinearSystem(ess_dofs, x, b, A, X, B);
 
     //create reference mesh for fespace
     Mesh reference_mesh = CreateReferenceMesh(mesh.Dimension());
@@ -93,7 +98,7 @@ int main(int argc, char *argv[])
 
     // Create multigrid hierarchy
     VoxelGraphHierarchy graph_hierarchy(
-        make_unique<VoxelGraph>(fes, image, reference_fes), ess_dofs,
+        make_unique<VoxelGraph>(pfes, image, reference_fes), ess_dofs,
         nlevels, reference_fes, h, a);
 
     Array<Operator*> operators(nlevels);
@@ -112,22 +117,39 @@ int main(int argc, char *argv[])
         prolongations[level] = graph_hierarchy.GetProlongations()[level].get();
     }
 
+    // TODO: Extend to n ranks
+    // Wrap each level's SparseMatrix in a HypreParMatrix (single rank only:
+    // the whole matrix is the diagonal block).
+    vector<array<HYPRE_BigInt, 2>> row_starts(nlevels);
+    vector<unique_ptr<HypreParMatrix>> par_operators(nlevels);
+
     // Set operators and smoothers for each level
     for (int level = 0; level < nlevels; level++)
     {
-        SparseMatrix *A = &graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
-        std::cout << "Level " << level << ": " << A->Height() << " DOFs\n";
+        // Convert SparseMatrix from graph code to ParMatrix
+        SparseMatrix &current_A = graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
+        row_starts[level] = {0, current_A.Height()};
+        par_operators[level] = make_unique<HypreParMatrix>(
+            MPI_COMM_WORLD, current_A.Height(), row_starts[level].data(), &current_A);
+
+        HypreParMatrix *A = par_operators[level].get();
+        HYPRE_BigInt ndofs = A->GetGlobalNumRows();
+        if (Mpi::Root()) { std::cout << "Level " << level << ": " << ndofs << " DOFs\n"; }
         operators[level] = A;
 
         if (level == 0)
         {
-            // Coarsest level: direct solver
-            smoothers[level] = new UMFPackSolver(*A);
+            // Coarsest level
+            HypreBoomerAMG *amg = new HypreBoomerAMG(*A);
+            amg->SetPrintLevel(0);
+            smoothers[level] = amg;
         }
         else
         {
             // Finer levels: smoother
-            smoothers[level] = new GSSmoother(*A);
+            HypreSmoother *s = new HypreSmoother(*A, HypreSmoother::l1GS);
+            s->SetOperatorSymmetry(true);
+            smoothers[level] = s;
         }
     }
 
@@ -136,15 +158,16 @@ int main(int argc, char *argv[])
                  own_smoothers, own_prolongations);
 
     //solve problem
-    CGSolver cg;
+    CGSolver cg(MPI_COMM_WORLD);
     cg.SetRelTol(1e-12);
     cg.SetMaxIter(2000);
     cg.SetPrintLevel(1);
-    cg.SetOperator(graph_hierarchy.GetGraphOperators()[nlevels-1]->GetMatrix());
+    //cg.SetOperator(graph_hierarchy.GetGraphOperators()[nlevels-1]->GetMatrix());
+    cg.SetOperator(*par_operators[nlevels-1]);
     cg.SetPreconditioner(mg);
     cg.Mult(B, X);
 
     a.RecoverFEMSolution(X,b,x);
-    x.Save("sol.gf");
-    mesh.Save("mesh.mesh");
+    x.SaveAsOne("sol.gf");
+    pmesh.SaveAsOne("mesh.mesh");
 }
