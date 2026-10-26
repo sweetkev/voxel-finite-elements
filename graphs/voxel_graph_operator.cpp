@@ -106,6 +106,9 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
     // Build hat{A} matrix.
     A_hat = SparseMatrix(nbdofs, nbdofs);
 
+    const std::vector<int> &fine_broken_to_true_dof = 
+        fine_operator.GetGraph().GetBrokenToTrueDofMap();
+
     for (int e = 0; e < ne; ++e)
     {
         Array<int> coarse_indices(dofs_per_elem);
@@ -124,7 +127,6 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
             }
         }
 
-        std::vector<int> fine_broken_to_true_dof = fine_operator.GetGraph().GetBrokenToTrueDofMap();
         Array<int> fine_true_dofs;
         for (int i = 0; i < fine_broken_dofs.Size(); ++i)
         {

@@ -83,10 +83,8 @@ VoxelGraph VoxelGraph::CoarsenGraph()
         CellIndex coarse_cell(fine_cell[0]/2, fine_cell[1]/2, fine_cell[2]/2);
 
         // Only add each coarse grid cell to list once
-        const auto coarse_cell_visited = find(coarse_grid_cells.begin(),
-                                              coarse_grid_cells.end(),
-                                              coarse_cell);
-        if (coarse_cell_visited == coarse_grid_cells.end())
+        vector<int> &coarse_cell_fine_elements = coarse_cell_to_fine_elements[coarse_cell];
+        if (coarse_cell_fine_elements.empty())
         {
             coarse_grid_cells.push_back(coarse_cell);
         }
@@ -95,8 +93,9 @@ VoxelGraph VoxelGraph::CoarsenGraph()
         for (int fine_element : cell_to_elements[fine_cell])
         {
             fine_element_to_coarse_cell[fine_element] = coarse_cell;
-            coarse_cell_to_fine_elements[coarse_cell].push_back(fine_element);
+            coarse_cell_fine_elements.push_back(fine_element);
         }
+
     }
 
     // Label each fine element with its associated coarse element and create the
@@ -217,14 +216,16 @@ VoxelGraph VoxelGraph::CoarsenGraph()
                      coarse_element_to_cell, reference_fes);
 }
 
-VoxelGraph::VoxelGraph(Table &graph_, vector<CellIndex> &grid_cells_,
-                         unordered_map<CellIndex, vector<int>> &cell_to_elements_,
-                         vector<CellIndex> &element_to_cell_,
+VoxelGraph::VoxelGraph(Table graph_, vector<CellIndex> grid_cells_,
+                         unordered_map<CellIndex, vector<int>> cell_to_elements_,
+                         vector<CellIndex> element_to_cell_,
                          const FiniteElementSpace &reference_fes_)
-    : graph(graph_), grid_cells(grid_cells_),
-      cell_to_elements(cell_to_elements_), element_to_cell(element_to_cell_),
+    : grid_cells(std::move(grid_cells_)),
+      cell_to_elements(std::move(cell_to_elements_)),
+      element_to_cell(std::move(element_to_cell_)),
       reference_fes(reference_fes_)
 {
+    graph.Swap(graph_);
     CreateReferenceDofMap();
     CreateDofGroups();
 }
@@ -297,10 +298,11 @@ void VoxelGraph::CreateDofGroups()
 
     for (int e = 0; e < ne; ++e)
     {
+        Array<int> connected_elements;
+        graph.GetRow(e, connected_elements);
+
         for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
         {
-            Array<int> connected_elements;
-            graph.GetRow(e, connected_elements);
             for (int neighbor : connected_elements)
             {
                 int neighbor_dof = GetNeighborDof(e, e_dof, neighbor);
@@ -374,7 +376,7 @@ void VoxelGraph::ReindexDofs(const FiniteElementSpace &fes)
 
         new_dof_groups[mfem_dof] = dof_groups[voxel_dof];
     }
-    dof_groups = new_dof_groups;
+    dof_groups.swap(new_dof_groups);
 
     for (int bdof = 0; bdof < nbdofs; ++bdof)
     {

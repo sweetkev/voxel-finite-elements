@@ -57,7 +57,7 @@ private:
     vector<set<int>> coarse_to_fine_elements_map;
 
     // Reference FES needed to determine DoF identification
-    FiniteElementSpace reference_fes;
+    const FiniteElementSpace &reference_fes;
 
     // Vector with size equal to number of true dofs whose entries contain the
     // sets of broken dofs identified with the true dof.    
@@ -72,9 +72,9 @@ private:
     // the central reference element.
     DenseMatrix local_to_neighbor_dof_map;    
 
-    VoxelGraph(Table &graph, vector<CellIndex> &grid_cells,
-               unordered_map<CellIndex, vector<int>> &cell_to_elements,
-               vector<CellIndex> &element_to_cell, 
+    VoxelGraph(Table graph, vector<CellIndex> grid_cells,
+               unordered_map<CellIndex, vector<int>> cell_to_elements,
+               vector<CellIndex> element_to_cell, 
                const FiniteElementSpace &reference_fes);
 
     // Creates the matrix whose ith row represents a local dof number
