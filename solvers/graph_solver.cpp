@@ -42,7 +42,8 @@ int main(int argc, char *argv[])
     VoxelImage &image = *image_ptr;
     Mesh mesh = image.MakeMesh();
 
-    const real_t h = mesh.GetElementSize(0, 0);
+    // All elements are identical squares/cubes with side length h
+    const real_t h = image.GetCellSize();
 
     // If nlevels was not specified, coarsen until smallest dimension is 1
     if (nlevels < 0)
@@ -65,7 +66,6 @@ int main(int argc, char *argv[])
     // Set up problem in parallel
     ParMesh pmesh(MPI_COMM_WORLD, mesh);
     H1_FECollection fec(order, mesh.Dimension());
-    // FiniteElementSpace fes(&mesh, &fec);
     ParFiniteElementSpace pfes(&pmesh, &fec);
 
     Array<int> ess_dofs;
@@ -97,8 +97,11 @@ int main(int argc, char *argv[])
     FiniteElementSpace reference_fes(&reference_mesh, &reference_fec);
 
     // Create multigrid hierarchy
+    // Grid cell of each local element, computed from its coordinates
+    vector<CellIndex> element_to_cell = ComputeElementCells(pmesh, h);
+
     VoxelGraphHierarchy graph_hierarchy(
-        make_unique<VoxelGraph>(pfes, image, reference_fes), ess_dofs,
+        make_unique<VoxelGraph>(pfes, std::move(element_to_cell), reference_fes), ess_dofs,
         nlevels, reference_fes, h, a);
 
     Array<Operator*> operators(nlevels);

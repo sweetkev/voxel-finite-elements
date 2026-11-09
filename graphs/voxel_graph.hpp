@@ -12,8 +12,11 @@ class VoxelGraph
 public:
     // Create a graph where each vertex of the graph corresponds to an occupied
     // pixel/voxel in the image, and edges are created using vertex adjacency
-    // of the pixels/voxels. 
-    VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image_, const FiniteElementSpace &reference_fes);
+    // of the pixels/voxels. element_to_cell gives the grid cell of each
+    // element of fes's mesh (see ComputeElementCells).
+    VoxelGraph(const FiniteElementSpace &fes,
+               vector<CellIndex> element_to_cell,
+               const FiniteElementSpace &reference_fes);
 
     // Returns the graph over a coarsened mesh. Each grid cell of the coarse
     // mesh is obtained by coarsening a 2x2(x2) block of grid cells in the fine

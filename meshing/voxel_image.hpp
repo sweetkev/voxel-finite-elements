@@ -34,6 +34,11 @@ template<> struct std::hash<CellIndex>
     }
 };
 
+// Returns the grid cell containing each element of the mesh, computed from the
+// element's vertex coordinates. The grid cell (i,j,k) is the element whose 
+// lower left corner is nearest to h*(i,j,k).
+vector<CellIndex> ComputeElementCells(const Mesh &mesh, real_t h);
+
 class VoxelImage 
 {
 public:
@@ -46,14 +51,17 @@ public:
     // Returns the mesh read from the image file, or a copy of the input mesh.
     Mesh MakeMesh();
 
-    // Returns map from element numbers to grid cell indices.
-    const vector<CellIndex>& GetElementToCell() const { return element_to_cell; }
+    // Returns the side length of elements.
+    real_t GetCellSize() const
+    {
+        return h;
+    }
 
 private:
     string file;
     unique_ptr<Mesh> input_mesh; // Set only when constructed from a mesh
 
-    vector<CellIndex> element_to_cell;
+    real_t h = 0.0; // Set by the constructor or MakeMesh()
 
     string GetFileType();
     Mesh ReadPgm();

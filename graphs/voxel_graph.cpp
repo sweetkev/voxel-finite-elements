@@ -40,8 +40,11 @@ Table RemoveSelfConnections(Table &graph)
 }
 }
 
-VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image, const FiniteElementSpace &reference_fes_)
-    : reference_fes(reference_fes_)
+VoxelGraph::VoxelGraph(const FiniteElementSpace &fes,
+                       vector<CellIndex> element_to_cell_,
+                       const FiniteElementSpace &reference_fes_)
+    : element_to_cell(std::move(element_to_cell_)),
+      reference_fes(reference_fes_)
 {
    // Element-to-element table is (element-to-dof) * (dof-to-element)
    const Table &element_to_dof = fes.GetElementToDofTable();
@@ -51,7 +54,6 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes, const VoxelImage &image, c
    graph = RemoveSelfConnections(new_graph);
 
    // Create maps between grid cells and elements
-   element_to_cell = image.GetElementToCell();
    for (int e = 0; e < (int)element_to_cell.size(); ++e)
    {
       const CellIndex &cell = element_to_cell[e];
@@ -80,7 +82,13 @@ VoxelGraph VoxelGraph::CoarsenGraph()
     // Find coarse grid cells
     for (CellIndex fine_cell : grid_cells)
     {
-        CellIndex coarse_cell(fine_cell[0]/2, fine_cell[1]/2, fine_cell[2]/2);
+        // Coarse cell index is floor(i/2).
+        CellIndex coarse_cell;
+        for (int d = 0; d < 3; ++d)
+        {
+            const int i = fine_cell[d];
+            coarse_cell[d] = (i >= 0) ? i / 2 : (i - 1) / 2;
+        }
 
         // Only add each coarse grid cell to list once
         vector<int> &coarse_cell_fine_elements = coarse_cell_to_fine_elements[coarse_cell];

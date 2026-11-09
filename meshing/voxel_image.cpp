@@ -12,65 +12,65 @@ using namespace std;
 
 VoxelImage::VoxelImage(string file_) : file(file_) {}
 
+namespace
+{
+// Lower corner of element e (the minimum of its vertex coordinates)
+array<real_t,3> ElementLowerCorner(const Mesh &mesh, int e)
+{
+   const int dim = mesh.Dimension();
+   Array<int> v;
+   mesh.GetElementVertices(e, v);
+   array<real_t,3> corner{0.0, 0.0, 0.0};
+   for (int i = 0; i < dim; ++i) { corner[i] = numeric_limits<real_t>::max(); }
+   for (int iv : v)
+   {
+      const real_t *x = mesh.GetVertex(iv);
+      for (int i = 0; i < dim; ++i) { corner[i] = min(corner[i], x[i]); }
+   }
+   return corner;
+}
+}
+
+vector<CellIndex> ComputeElementCells(const Mesh &mesh, real_t h)
+{
+   const int dim = mesh.Dimension();
+   const int ne = mesh.GetNE();
+
+   vector<CellIndex> element_to_cell(ne);
+   for (int e = 0; e < ne; ++e)
+   {
+      const array<real_t,3> lo = ElementLowerCorner(mesh, e);
+      CellIndex cell;
+      for (int d = 0; d < dim; ++d)
+      {
+         cell[d] = (int)round(lo[d] / h);
+      }
+      element_to_cell[e] = cell;
+   }
+   return element_to_cell;
+}
+
 VoxelImage::VoxelImage(const Mesh &mesh_) : input_mesh(new Mesh(mesh_))
 {
    const Mesh &mesh = *input_mesh;
    const int dim = mesh.Dimension();
-   const int ne = mesh.GetNE();
 
-   // Lower corner of each element's bounding box, and its extent
-   auto ElementBox = [&](int e, array<real_t,3> &lo, array<real_t,3> &hi)
-   {
-      Array<int> v;
-      mesh.GetElementVertices(e, v);
-      lo.fill(numeric_limits<real_t>::max());
-      hi.fill(numeric_limits<real_t>::lowest());
-      for (int iv : v)
-      {
-         const real_t *x = mesh.GetVertex(iv);
-         for (int d = 0; d < dim; ++d)
-         {
-            lo[d] = min(lo[d], x[d]);
-            hi[d] = max(hi[d], x[d]);
-         }
-      }
-   };
-
-   // Cell size is taken from the first element
-   array<real_t,3> lo, hi, h;
-   ElementBox(0, lo, hi);
-   for (int d = 0; d < dim; ++d)
-   {
-      h[d] = hi[d] - lo[d];
-   }
-
-   // Grid origin is the lower corner of the mesh's bounding box
-   array<real_t,3> origin;
-   origin.fill(numeric_limits<real_t>::max());
-   for (int iv = 0; iv < mesh.GetNV(); ++iv)
+   // Determine h
+   Array<int> v;
+   mesh.GetElementVertices(0, v);
+   array<real_t,3> lo, hi;
+   lo.fill(numeric_limits<real_t>::max());
+   hi.fill(numeric_limits<real_t>::lowest());
+   for (int iv : v)
    {
       const real_t *x = mesh.GetVertex(iv);
       for (int d = 0; d < dim; ++d)
       {
-         origin[d] = min(origin[d], x[d]);
+         lo[d] = min(lo[d], x[d]);
+         hi[d] = max(hi[d], x[d]);
       }
    }
-
-   // Place each element in its grid cell
-   const real_t tol = 1e-8;
-   unordered_set<CellIndex> occupied;
-   element_to_cell.resize(ne);
-   for (int e = 0; e < ne; ++e)
-   {
-      ElementBox(e, lo, hi);
-      CellIndex cell;
-      for (int d = 0; d < dim; ++d)
-      {
-         const real_t s = (lo[d] - origin[d]) / h[d];
-         cell[d] = (int)round(s);
-      }
-      element_to_cell[e] = cell;
-   }
+   h = hi[0] - lo[0];
 }
 
 Mesh VoxelImage::MakeMesh() {
@@ -175,18 +175,19 @@ Mesh VoxelImage::ReadPgm() {
 
     // Add all vertices in the grid, even if they are unused. We will remove
     // unused vertices later.
-    real_t h = 1.0 / cell_dims[0];
+    const real_t h_pgm = 1.0 / cell_dims[0];
     for (int j = 0; j < cell_dims[1] + 1; ++j)
     {
         for (int i = 0; i < cell_dims[0] + 1; ++i)
         {
-            mesh.AddVertex(i*h, j*h);
+            mesh.AddVertex(i*h_pgm, j*h_pgm);
         }
     }
 
+    // Square cells of size h_pgm, with vertices at multiples of h_pgm
+    h = h_pgm;
+
     // Add the elements.
-    element_to_cell.clear();
-    element_to_cell.reserve(ne);
     int e = 0;
     for (int j = 0; j < cell_dims[1]; ++j)
     {
@@ -199,7 +200,6 @@ Mesh VoxelImage::ReadPgm() {
                 const int v3 = v1 + cell_dims[0] + 1 + 1;
                 const int v4 = v3 - 1;
                 mesh.AddQuad(v1, v2, v3, v4);
-                element_to_cell.push_back(CellIndex(i, j));
                 e++;
             }
         }
@@ -385,17 +385,17 @@ Mesh VoxelImage::ReadNrrd()
       mesh.AddVertex(coords.data());
    }
 
-   element_to_cell.clear();
-   element_to_cell.reserve(cell_i);
+   // Cell size matching the vertex coordinates above. Voxels must be cubes.
+   h = phys_dims[0] / double(cell_dims[0]);
+   for (int d = 1; d < dim; ++d)
+   {
+      const real_t h_d = phys_dims[d] / double(cell_dims[d]);
+      MFEM_VERIFY(abs(h_d - h) <= 1e-8 * h,
+                  "Voxels must be cubes: spacing differs between dimensions.");
+   }
+
    for (int i = 0; i < cell_i; ++i)
    {
-      {
-         const auto cell_cart = cell_idx.CartesianIndex(cell2lex[i]);
-         CellIndex cell;
-         for (int d = 0; d < dim; ++d) { cell[d] = cell_cart[d]; }
-         element_to_cell.push_back(cell);
-      }
-
       if (dim == 2)
       {
          MFEM_ABORT("");
