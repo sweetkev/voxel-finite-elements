@@ -117,25 +117,13 @@ int main(int argc, char *argv[])
 
     for (int level = 0; level < nlevels - 1; ++level)
     {
-        prolongations[level] = graph_hierarchy.GetProlongations()[level].get();
+        prolongations[level] = &graph_hierarchy.GetParProlongation(level);
     }
-
-    // TODO: Extend to n ranks
-    // Wrap each level's SparseMatrix in a HypreParMatrix (single rank only:
-    // the whole matrix is the diagonal block).
-    vector<array<HYPRE_BigInt, 2>> row_starts(nlevels);
-    vector<unique_ptr<HypreParMatrix>> par_operators(nlevels);
 
     // Set operators and smoothers for each level
     for (int level = 0; level < nlevels; level++)
     {
-        // Convert SparseMatrix from graph code to ParMatrix
-        SparseMatrix &current_A = graph_hierarchy.GetGraphOperators()[level]->GetMatrix();
-        row_starts[level] = {0, current_A.Height()};
-        par_operators[level] = make_unique<HypreParMatrix>(
-            MPI_COMM_WORLD, current_A.Height(), row_starts[level].data(), &current_A);
-
-        HypreParMatrix *A = par_operators[level].get();
+        HypreParMatrix *A = &graph_hierarchy.GetParOperator(level);
         HYPRE_BigInt ndofs = A->GetGlobalNumRows();
         if (Mpi::Root()) { std::cout << "Level " << level << ": " << ndofs << " DOFs\n"; }
         operators[level] = A;
@@ -165,8 +153,7 @@ int main(int argc, char *argv[])
     cg.SetRelTol(1e-12);
     cg.SetMaxIter(2000);
     cg.SetPrintLevel(1);
-    //cg.SetOperator(graph_hierarchy.GetGraphOperators()[nlevels-1]->GetMatrix());
-    cg.SetOperator(*par_operators[nlevels-1]);
+    cg.SetOperator(graph_hierarchy.GetParOperator(nlevels - 1));
     cg.SetPreconditioner(mg);
     cg.Mult(B, X);
 
