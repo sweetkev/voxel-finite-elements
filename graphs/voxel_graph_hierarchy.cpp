@@ -24,7 +24,7 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
                     Array<int> &fine_ess_dofs,
                     int nlevels,
                     FiniteElementSpace &reference_fes_,
-                    real_t h_, BilinearForm &a)
+                    real_t h_, ParBilinearForm &a)
                     : reference_fes(reference_fes_), h(h_)
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
@@ -32,16 +32,16 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     graphs.resize(nlevels);
     ess_dofs.resize(nlevels);
     prolongations.resize(nlevels - 1);
+    par_prolongations.resize(nlevels - 1);
     graph_operators.resize(nlevels);
 
     graphs[nlevels - 1] = std::move(fine_graph);
     ess_dofs[nlevels - 1] = fine_ess_dofs;
     graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h, a);
-    // Eliminate BCs from the finest level operator.
-    for (const int ess_dof : fine_ess_dofs)
-    {
-        graph_operators[nlevels - 1]->GetMatrix().EliminateRowCol(ess_dof, Operator::DIAG_ONE);
-    }
+    // Assemble the finest level operator in parallel and eliminate BCs.
+    graph_operators[nlevels - 1]->ParallelAssemble(*a.ParFESpace());
+    graph_operators[nlevels - 1]->GetParMatrix().EliminateBC(fine_ess_dofs,
+                                                             Operator::DIAG_ONE);
 
     for (int i = nlevels - 2; i >= 0; --i)
     {
