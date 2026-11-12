@@ -63,7 +63,7 @@ VoxelGraph::VoxelGraph(const FiniteElementSpace &fes,
    }
 
    CreateReferenceDofMap();
-   CreateDofGroups();
+   CreateBrokenToTrueDofMap();
 
    ReindexDofs(fes);
 }
@@ -235,7 +235,7 @@ VoxelGraph::VoxelGraph(Table graph_, vector<CellIndex> grid_cells_,
 {
     graph.Swap(graph_);
     CreateReferenceDofMap();
-    CreateDofGroups();
+    CreateBrokenToTrueDofMap();
 }
 
 void VoxelGraph::CreateReferenceDofMap()
@@ -273,7 +273,7 @@ void VoxelGraph::CreateReferenceDofMap()
     }
 }
 
-void VoxelGraph::CreateDofGroups()
+void VoxelGraph::CreateBrokenToTrueDofMap()
 {
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
     const int ne = graph.Size();
@@ -330,25 +330,20 @@ void VoxelGraph::CreateDofGroups()
         }
     }
 
+    // Build map from broken dof number to true dof number. Each nonempty
+    // connected component becomes one true dof.
+    broken_to_true_dof.assign(nbdofs, -1);
+    int tdof = 0;
     for (int i = 0; i < nbdofs; ++i)
     {
-        if (!connected_components[i].empty())
-        {
-            dof_groups.push_back(connected_components[i]);
-        }
-    }
-
-    // Build map from broken dof number to true dof number
-    broken_to_true_dof.assign(nbdofs, -1);
-    const int ntdofs = dof_groups.size();
-    for (int tdof = 0; tdof < ntdofs; ++tdof)
-    {
-        const std::set<int> &dof_group = dof_groups[tdof];
-        for (int broken_dof : dof_group)
+        if (connected_components[i].empty()) { continue; }
+        for (int broken_dof : connected_components[i])
         {
             broken_to_true_dof[broken_dof] = tdof;
         }
+        ++tdof;
     }
+    num_true_dofs = tdof;
 }
 
 int VoxelGraph::GetNeighborDof(int e, int e_dof, int neighbor)
@@ -369,10 +364,9 @@ int VoxelGraph::GetNeighborDof(int e, int e_dof, int neighbor)
 void VoxelGraph::ReindexDofs(const FiniteElementSpace &fes)
 {
     int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
-    int ntdofs = dof_groups.size();
+    int ntdofs = num_true_dofs;
     int ne = graph.Size();
     int nbdofs = dofs_per_elem * ne;
-    vector<set<int>> new_dof_groups(ntdofs);
     vector<int> voxel_to_mfem(ntdofs);
     for (int mfem_dof = 0; mfem_dof < ntdofs; ++mfem_dof)
     {
@@ -381,10 +375,7 @@ void VoxelGraph::ReindexDofs(const FiniteElementSpace &fes)
         int broken_dof = e * dofs_per_elem + local_mfem_index;
         int voxel_dof = broken_to_true_dof[broken_dof];
         voxel_to_mfem[voxel_dof] = mfem_dof;
-
-        new_dof_groups[mfem_dof] = dof_groups[voxel_dof];
     }
-    dof_groups.swap(new_dof_groups);
 
     for (int bdof = 0; bdof < nbdofs; ++bdof)
     {

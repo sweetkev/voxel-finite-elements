@@ -106,15 +106,13 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
     // The first 4 entries are the quad ordering; all 8 are the hex ordering.
     static constexpr int map_from_lex[8] = {0, 1, 3, 2, 4, 5, 7, 6};
 
-    const vector<set<int>> &coarse_dof_groups = coarse_graph.GetDofGroups();
     const vector<int> &coarse_broken_to_true_dof = coarse_graph.GetBrokenToTrueDofMap();
-    const vector<set<int>> &fine_dof_groups = fine_graph.GetDofGroups();
     const vector<int> &fine_broken_to_true_dof = fine_graph.GetBrokenToTrueDofMap();
     const vector<int> &fine_to_coarse_element_map = fine_graph.GetFineToCoarseElementMap();
 
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
-    const int num_coarse_dofs = coarse_dof_groups.size();
-    const int num_fine_dofs = fine_dof_groups.size();
+    const int num_coarse_dofs = coarse_graph.NumTrueDofs();
+    const int num_fine_dofs = fine_graph.NumTrueDofs();
 
     SparseMatrix P(num_fine_dofs, num_coarse_dofs);
 

@@ -10,7 +10,7 @@ VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
     BuildARef(a);
 
     // Build A matrix
-    BuildA(graph.GetDofGroups(), graph.GetBrokenToTrueDofMap());
+    BuildA(graph.NumTrueDofs(), graph.GetBrokenToTrueDofMap());
 }
 
 VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
@@ -19,7 +19,7 @@ VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
                                        SparseMatrix &P)
                                        : reference_fes(reference_fes_), graph(graph_)
 {
-    BuildA(graph.GetDofGroups(), graph.GetBrokenToTrueDofMap(), fine_operator, P);
+    BuildA(graph.NumTrueDofs(), graph.GetBrokenToTrueDofMap(), fine_operator, P);
 }
 
 void VoxelGraphOperator::ParallelAssemble(ParFiniteElementSpace &pfes)
@@ -68,7 +68,7 @@ void VoxelGraphOperator::BuildARef(BilinearForm &a)
     }
 }
 
-void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
+void VoxelGraphOperator::BuildA(int ntdofs,
                                 const std::vector<int> &broken_to_true_dof)
 {
     // Build A using matrix. Lambda(i,j) = 1 if broken dof i is identified with
@@ -77,7 +77,6 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
     const int ne = graph.Size();
     const int nbdofs = dofs_per_elem * ne;
-    const int ntdofs = dof_groups.size();
 
     Lambda = SparseMatrix(nbdofs, ntdofs);
     for (int bdof = 0; bdof < nbdofs; ++bdof)
@@ -108,7 +107,7 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
     A.Swap(*A_ptr);
 }
 
-void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
+void VoxelGraphOperator::BuildA(int ntdofs,
                                 const std::vector<int> &broken_to_true_dof,
                                 VoxelGraphOperator &fine_operator,
                                 SparseMatrix &P)
@@ -119,7 +118,6 @@ void VoxelGraphOperator::BuildA(const std::vector<std::set<int>> &dof_groups,
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
     const int ne = graph.Size();
     const int nbdofs = dofs_per_elem * ne;
-    const int ntdofs = dof_groups.size();
 
     Lambda = SparseMatrix(nbdofs, ntdofs);
     for (int bdof = 0; bdof < nbdofs; ++bdof)

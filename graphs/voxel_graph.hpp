@@ -24,7 +24,7 @@ public:
     // becomes a new vertex in the coarse graph.
     VoxelGraph CoarsenGraph();
 
-    const vector<set<int>> &GetDofGroups() const { return dof_groups; }
+    int NumTrueDofs() const { return num_true_dofs; }
 
     const vector<int> &GetBrokenToTrueDofMap() const 
     { 
@@ -62,9 +62,8 @@ private:
     // Reference FES needed to determine DoF identification
     const FiniteElementSpace &reference_fes;
 
-    // Vector with size equal to number of true dofs whose entries contain the
-    // sets of broken dofs identified with the true dof.    
-    vector<set<int>> dof_groups;
+    // Number of true dofs.
+    int num_true_dofs = 0;
 
     // Maps each broken dof index to the true dof index.
     // Size is (ne * dofs_per_element).
@@ -84,9 +83,9 @@ private:
     // and jth column represents a reference element in the reference mesh.
     void CreateReferenceDofMap();
     
-    // Creates the vector with size equal to number of true dofs whose entries
-    // contain the sets of broken dofs identified with the true dof.
-    void CreateDofGroups();
+    // Identifies broken dofs shared between neighboring elements, then builds
+    // broken_to_true_dof and sets num_true_dofs.
+    void CreateBrokenToTrueDofMap();
 
     // Returns the local dof number on neighbor element that corresponds
     // to the local dof number e_dof on element e. If the dof is not shared
