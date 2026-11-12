@@ -22,6 +22,31 @@ VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
     BuildA(graph.GetDofGroups(), graph.GetBrokenToTrueDofMap(), fine_operator, P);
 }
 
+void VoxelGraphOperator::ParallelAssemble(ParFiniteElementSpace &pfes)
+{
+    MPI_Comm comm = pfes.GetComm();
+
+    // Row partition of the broken dofs (one block of rows per rank).
+    HYPRE_BigInt local_nbdofs = A_hat.Height();
+    HYPRE_BigInt global_nbdofs = 0;
+    MPI_Allreduce(&local_nbdofs, &global_nbdofs, 1, HYPRE_MPI_BIG_INT,
+                  MPI_SUM, comm);
+    Array<HYPRE_BigInt> *offsets[1] = { &broken_offsets };
+    pfes.GetParMesh()->GenerateOffsets(1, &local_nbdofs, offsets);
+
+    // Â is block diagonal over elements, so it has no off-rank couplings.
+    A_hat_par = make_unique<HypreParMatrix>(comm, global_nbdofs,
+                                            broken_offsets.GetData(), &A_hat);
+
+    // Λ_f = (broken -> local dof) * (local dof -> true dof)
+    Lambda_local_par = make_unique<HypreParMatrix>(
+        comm, global_nbdofs, pfes.GlobalVSize(), broken_offsets.GetData(),
+        pfes.GetDofOffsets(), &Lambda);
+    Lambda_par.reset(ParMult(Lambda_local_par.get(), pfes.Dof_TrueDof_Matrix()));
+
+    A_par.reset(RAP(A_hat_par.get(), Lambda_par.get()));
+}
+
 void VoxelGraphOperator::BuildARef(BilinearForm &a)
 {
     Array<BilinearFormIntegrator*> domain_integs = *a.GetDBFI();
