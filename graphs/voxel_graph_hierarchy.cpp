@@ -23,9 +23,10 @@ void EliminateProlongationEssentialDOFs(SparseMatrix &P,
 VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
                     Array<int> &fine_ess_dofs,
                     int nlevels,
+                    const CellOwnership &ownership_,
                     FiniteElementSpace &reference_fes_,
                     real_t h_, ParBilinearForm &a)
-                    : reference_fes(reference_fes_), h(h_)
+                    : ownership(ownership_), reference_fes(reference_fes_), h(h_)
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
 

@@ -3,6 +3,7 @@
 #include "voxel_graph.hpp"
 #include "voxel_graph_operator.hpp"
 #include "voxel_graph_hierarchy.hpp"
+#include "cell_ownership.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -100,9 +101,13 @@ int main(int argc, char *argv[])
     // Grid cell of each local element, computed from its coordinates
     vector<CellIndex> element_to_cell = ComputeElementCells(pmesh, h);
 
+    // Owner rank of each coarse grid cell on every coarse level: the lowest
+    // rank holding fine elements in the cell.
+    CellOwnership ownership(MPI_COMM_WORLD, element_to_cell, nlevels);
+
     VoxelGraphHierarchy graph_hierarchy(
         make_unique<VoxelGraph>(pfes, std::move(element_to_cell), reference_fes), ess_dofs,
-        nlevels, reference_fes, h, a);
+        nlevels, ownership, reference_fes, h, a);
 
     Array<Operator*> operators(nlevels);
     Array<Solver*> smoothers(nlevels);

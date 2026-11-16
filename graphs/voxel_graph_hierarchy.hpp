@@ -3,6 +3,7 @@
 #include "mfem.hpp"
 #include "voxel_graph.hpp"
 #include "voxel_graph_operator.hpp"
+#include "cell_ownership.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -10,9 +11,11 @@ using namespace std;
 class VoxelGraphHierarchy
 {
 public:
-    // Creates finest level operator from a.
+    // Creates finest level operator from a. ownership gives the rank that
+    // coarsens each coarse grid cell.
     // TODO: Implement coarser levels.
     VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, Array<int> &fine_ess_dofs, int nlevels,
+                        const CellOwnership &ownership,
                         FiniteElementSpace &reference_fes, real_t h,
                         ParBilinearForm &a);
 
@@ -39,7 +42,9 @@ private:
     // Parallel prolongations (true dof numbering)
     vector<unique_ptr<HypreParMatrix>> par_prolongations;
     vector<unique_ptr<VoxelGraphOperator>> graph_operators;
-    
+
+    // Owner rank of each coarse grid cell on every coarse level
+    const CellOwnership &ownership;
 
     FiniteElementSpace &reference_fes;
     DenseTensor local_prolongation;

@@ -20,7 +20,8 @@ MESH_SRCS := \
 GRAPH_SRCS := \
 	graphs/voxel_graph.cpp \
 	graphs/voxel_graph_operator.cpp \
-	graphs/voxel_graph_hierarchy.cpp
+	graphs/voxel_graph_hierarchy.cpp \
+	graphs/cell_ownership.cpp
 
 MESH_OBJS := $(MESH_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 GRAPH_OBJS := $(GRAPH_SRCS:%.cpp=$(BUILD_DIR)/%.o)
