@@ -2,11 +2,6 @@
 #include <algorithm>
 #include <unordered_set>
 
-namespace
-{
-// send[r] goes to rank r. Returns the
-// concatenation of all received buffers ordered by source rank, with the number
-// of ints received from each rank in recv_counts.
 vector<int> Exchange(MPI_Comm comm, const vector<vector<int>> &send,
                      vector<int> &recv_counts)
 {
@@ -39,7 +34,6 @@ vector<int> Exchange(MPI_Comm comm, const vector<vector<int>> &send,
                   recv_buf.data(), recv_counts.data(), recv_displs.data(), MPI_INT,
                   comm);
     return recv_buf;
-}
 }
 
 CellIndex AncestorCell(const CellIndex &cell, int current_level, int coarse_level)

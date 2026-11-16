@@ -1,6 +1,7 @@
 #pragma once
 
 #include "voxel_image.hpp"
+#include "cell_ownership.hpp"
 #include "mfem.hpp"
 #include <unordered_map>
 
@@ -13,16 +14,47 @@ public:
     // Create a graph where each vertex of the graph corresponds to an occupied
     // pixel/voxel in the image, and edges are created using vertex adjacency
     // of the pixels/voxels. element_to_cell gives the grid cell of each
-    // element of fes's mesh (see ComputeElementCells).
-    VoxelGraph(const FiniteElementSpace &fes,
+    // element of pfes's mesh. Each rank holds the elements of its part of the 
+    // mesh, and neighbors on other ranks are found through the shared mesh 
+    // vertices.
+    VoxelGraph(const ParFiniteElementSpace &pfes,
                vector<CellIndex> element_to_cell,
                const FiniteElementSpace &reference_fes);
 
-    // Returns the graph over a coarsened mesh. Each grid cell of the coarse
-    // mesh is obtained by coarsening a 2x2(x2) block of grid cells in the fine
+    // Returns the graph over a coarsened mesh. Each grid cell of the coarse 
+    // mesh is obtained by coarsening a 2x2(x2) block of grid cells in the finer
     // mesh. Each connected component of the graph over a coarse grid cell 
     // becomes a new vertex in the coarse graph.
-    VoxelGraph CoarsenGraph();
+    //
+    // All of the coarsening work for a coarse grid cell (connected components
+    // and coarse adjacency) is done on the cell's owner from ownership, and
+    // the resulting coarse elements live on that rank:
+    //   1. Every fine element is sent with its neighbor list to the owner of
+    //      its coarse grid cell.
+    //   2. Each owner labels the connected components of its cells, and tells
+    //      the rank holding each fine element which coarse element it joined.
+    //   3. Each owner asks the ranks holding neighbors outside its cells for
+    //      their coarse elements, then builds the coarse adjacency.
+    VoxelGraph CoarsenGraph(const CellOwnership &ownership, int coarse_level);
+
+    // Global number of local element e. Elements are numbered contiguously by
+    // rank (like the values in CSR format).
+    int GlobalElementNumber(int e) const { return element_offsets[rank] + e; }
+
+    // Rank holding the element with global number global_e.
+    int ElementRank(int global_e) const;
+
+    int GlobalNE() const { return element_offsets.back(); }
+
+    // Adjacency between local elements, in local element numbering.
+    const Table &GetGraph() const { return graph; }
+
+    // Global numbers of the neighbors of each local element that live on
+    // other ranks (one row per local element).
+    const Table &GetOffRankNeighbors() const
+    {
+        return off_rank_neighbors;
+    }
 
     int NumTrueDofs() const { return num_true_dofs; }
 
@@ -31,11 +63,14 @@ public:
         return broken_to_true_dof; 
     }
 
+    // Global number of the coarse element containing each local element.
     const vector<int> &GetFineToCoarseElementMap() const 
     { 
         return fine_to_coarse_element_map;
     }
 
+    // Global numbers of the fine elements contained in each coarse element
+    // owned by this rank (local coarse numbering).
     const vector<set<int>> &GetCoarseToFineElementsMap() const
     {
         return coarse_to_fine_elements_map;
@@ -46,8 +81,17 @@ public:
     int Size() const { return graph.Size(); }
 
 private:
-    // Graph structure
+    MPI_Comm comm;
+    int rank;
+
+    // element_offsets[r] is the global number of the first element on rank r;
+    // size is nranks + 1.
+    vector<int> element_offsets;
+
+    // Graph structure. graph holds edges between local elements;
+    // off_rank_neighbors holds the global numbers of neighbors on other ranks.
     Table graph;
+    Table off_rank_neighbors;
     vector<CellIndex> grid_cells; // Occupied grid cells
 
     // Maps between grid cells and elements
@@ -55,7 +99,8 @@ private:
     vector<CellIndex> element_to_cell;
 
     // Fine-to-coarse element map. This is the "labeling" of each fine element
-    // that determines which coarse element it belongs to.
+    // that determines which coarse element it belongs to (global coarse
+    // numbering).
     vector<int> fine_to_coarse_element_map;
     vector<set<int>> coarse_to_fine_elements_map;
 
@@ -74,10 +119,16 @@ private:
     // the central reference element.
     DenseMatrix local_to_neighbor_dof_map;    
 
-    VoxelGraph(Table graph, vector<CellIndex> grid_cells,
+    VoxelGraph(MPI_Comm comm, vector<int> element_offsets, Table graph,
+               Table off_rank_neighbors,
+               vector<CellIndex> grid_cells,
                unordered_map<CellIndex, vector<int>> cell_to_elements,
                vector<CellIndex> element_to_cell, 
                const FiniteElementSpace &reference_fes);
+
+    // Finds off_rank_neighbors: elements on other ranks sharing a mesh vertex
+    // with a local element. Collective.
+    void FindOffRankNeighbors(const ParFiniteElementSpace &pfes);
 
     // Creates the matrix whose ith row represents a local dof number
     // and jth column represents a reference element in the reference mesh.

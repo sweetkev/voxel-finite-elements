@@ -13,7 +13,7 @@ class VoxelGraphHierarchy
 public:
     // Creates finest level operator from a. ownership gives the rank that
     // coarsens each coarse grid cell.
-    // TODO: Implement coarser levels.
+    // TODO: Implement coarser level operators in parallel.
     VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, Array<int> &fine_ess_dofs, int nlevels,
                         const CellOwnership &ownership,
                         FiniteElementSpace &reference_fes, real_t h,

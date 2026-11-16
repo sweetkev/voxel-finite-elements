@@ -44,9 +44,18 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     graph_operators[nlevels - 1]->GetParMatrix().EliminateBC(fine_ess_dofs,
                                                              Operator::DIAG_ONE);
 
+    // Coarsen the graph level by level. The coarsening of each coarse grid
+    // cell happens on its owner.
     for (int i = nlevels - 2; i >= 0; --i)
     {
-        graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph());
+        graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph(ownership, i));
+    }
+
+    // TODO: The prolongations and coarse operators below assume that each
+    // coarse element lives on the same rank as its fine elements, which only
+    // holds on one rank.
+    for (int i = nlevels - 2; i >= 0; --i)
+    {
         prolongations[i] = make_unique<SparseMatrix>(CreateProlongation(*graphs[i], *graphs[i+1], ess_dofs[i], ess_dofs[i+1]));
         graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], *graph_operators[i+1], *prolongations[i]);
 

@@ -8,6 +8,12 @@
 using namespace mfem;
 using namespace std;
 
+// All-to-all exchange: send[r] goes to rank r. Returns the
+// concatenation of all received buffers ordered by source rank, with the number
+// of ints received from each rank in recv_counts.
+vector<int> Exchange(MPI_Comm comm, const vector<vector<int>> &send,
+                     vector<int> &recv_counts);
+
 // Returns the grid cell on coarse_level containing grid cell `cell` on
 // current_level.
 CellIndex AncestorCell(const CellIndex &cell, int current_level,
