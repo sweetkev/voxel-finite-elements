@@ -116,13 +116,13 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
     // The first 4 entries are the quad ordering; all 8 are the hex ordering.
     static constexpr int map_from_lex[8] = {0, 1, 3, 2, 4, 5, 7, 6};
 
-    const vector<int> &coarse_broken_to_true_dof = coarse_graph.GetBrokenToTrueDofMap();
-    const vector<int> &fine_broken_to_true_dof = fine_graph.GetBrokenToTrueDofMap();
+    const vector<int> &coarse_broken_to_local_dof = coarse_graph.GetBrokenToLocalDofMap();
+    const vector<int> &fine_broken_to_local_dof = fine_graph.GetBrokenToLocalDofMap();
     const vector<int> &fine_to_coarse_element_map = fine_graph.GetFineToCoarseElementMap();
 
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
-    const int num_coarse_dofs = coarse_graph.NumTrueDofs();
-    const int num_fine_dofs = fine_graph.NumTrueDofs();
+    const int num_coarse_dofs = coarse_graph.NumLocalDofs();
+    const int num_fine_dofs = fine_graph.NumLocalDofs();
 
     SparseMatrix P(num_fine_dofs, num_coarse_dofs);
 
@@ -144,13 +144,13 @@ SparseMatrix VoxelGraphHierarchy::CreateProlongation(const VoxelGraph &coarse_gr
         Array<int> cols(dofs_per_elem);
         for (int rf = 0; rf < dofs_per_elem; ++rf)
         {
-            const int fine_tdof = fine_broken_to_true_dof[fine_e * dofs_per_elem + rf];
-            rows[rf] = fine_tdof;
+            const int fine_dof = fine_broken_to_local_dof[fine_e * dofs_per_elem + rf];
+            rows[rf] = fine_dof;
         }
         for (int rc = 0; rc < dofs_per_elem; ++rc)
         {
-            const int coarse_tdof = coarse_broken_to_true_dof[coarse_e * dofs_per_elem + rc];
-            cols[rc] = coarse_tdof;
+            const int coarse_dof = coarse_broken_to_local_dof[coarse_e * dofs_per_elem + rc];
+            cols[rc] = coarse_dof;
         }
         P.SetSubMatrix(rows, cols, local_prolongation(local_prolongation_index));
     }

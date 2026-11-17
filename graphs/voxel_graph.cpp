@@ -63,6 +63,24 @@ int OffsetRank(const vector<int> &offsets, int i)
 {
    return upper_bound(offsets.begin(), offsets.end(), i) - offsets.begin() - 1;
 }
+
+// Converts offsets from GlobalOffsets into a hypre partitioning array:
+// [offsets[rank], offsets[rank + 1]] if HYPRE_AssumedPartitionCheck(), and all
+// of offsets otherwise.
+Array<HYPRE_BigInt> HyprePartitioning(const vector<int> &offsets, int rank)
+{
+   Array<HYPRE_BigInt> partitioning;
+   if (HYPRE_AssumedPartitionCheck())
+   {
+      partitioning.Append(offsets[rank]);
+      partitioning.Append(offsets[rank + 1]);
+   }
+   else
+   {
+      for (int offset : offsets) { partitioning.Append(offset); }
+   }
+   return partitioning;
+}
 }
 
 VoxelGraph::VoxelGraph(const ParFiniteElementSpace &pfes,
@@ -92,9 +110,10 @@ VoxelGraph::VoxelGraph(const ParFiniteElementSpace &pfes,
    }
 
    CreateReferenceDofMap();
-   CreateBrokenToTrueDofMap();
+   CreateBrokenToLocalDofMap();
 
    ReindexDofs(pfes);
+   dof_truedof = pfes.Dof_TrueDof_Matrix();
 }
 
 int VoxelGraph::ElementRank(int global_e) const
@@ -507,7 +526,8 @@ VoxelGraph::VoxelGraph(MPI_Comm comm_, vector<int> element_offsets_,
     graph.Swap(graph_);
     off_rank_neighbors.Swap(off_rank_neighbors_);
     CreateReferenceDofMap();
-    CreateBrokenToTrueDofMap();
+    CreateBrokenToLocalDofMap();
+    CreateDofTrueDofMatrix();
 }
 
 void VoxelGraph::CreateReferenceDofMap()
@@ -545,7 +565,7 @@ void VoxelGraph::CreateReferenceDofMap()
     }
 }
 
-void VoxelGraph::CreateBrokenToTrueDofMap()
+void VoxelGraph::CreateBrokenToLocalDofMap()
 {
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
     const int ne = graph.Size();
@@ -602,27 +622,174 @@ void VoxelGraph::CreateBrokenToTrueDofMap()
         }
     }
 
-    // Build map from broken dof number to true dof number. Each nonempty
-    // connected component becomes one true dof.
-    broken_to_true_dof.assign(nbdofs, -1);
-    int tdof = 0;
+    // Build map from broken dof number to local dof number. Each nonempty
+    // connected component becomes one local dof.
+    broken_to_local_dof.assign(nbdofs, -1);
+    int dof = 0;
     for (int i = 0; i < nbdofs; ++i)
     {
         if (connected_components[i].empty()) { continue; }
         for (int broken_dof : connected_components[i])
         {
-            broken_to_true_dof[broken_dof] = tdof;
+            broken_to_local_dof[broken_dof] = dof;
         }
-        ++tdof;
+        ++dof;
     }
-    num_true_dofs = tdof;
+    num_local_dofs = dof;
 }
 
-int VoxelGraph::GetNeighborDof(int e, int e_dof, int neighbor)
+void VoxelGraph::CreateDofTrueDofMatrix()
 {
-    CellIndex e_cell = element_to_cell[e];
-    CellIndex neighbor_cell = element_to_cell[neighbor];
+    const int nranks = element_offsets.size() - 1;
+    const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
+    const int ndofs = num_local_dofs;
 
+    // 1. Label each local dof with its global number.
+    const vector<int> dof_offsets = GlobalOffsets(comm, ndofs);
+    vector<int> label(ndofs);
+    for (int dof = 0; dof < ndofs; ++dof)
+    {
+        label[dof] = dof_offsets[rank] + dof;
+    }
+
+    // 2. Lower each label to the smallest label of the matching dofs on
+    //    off-rank neighbors until no label changes anywhere.
+    // Sends [neighbor global element, i, j, k, labels of the
+    //        element's dofs]
+    const int message_size = 4 + dofs_per_elem;
+    bool changed = true;
+    while (changed)
+    {
+        vector<vector<int>> send(nranks);
+        Array<int> neighbors;
+        for (int e = 0; e < Size(); ++e)
+        {
+            const CellIndex &cell = element_to_cell[e];
+            off_rank_neighbors.GetRow(e, neighbors);
+            for (int neighbor : neighbors)
+            {
+                vector<int> &buf = send[ElementRank(neighbor)];
+                buf.insert(buf.end(), {neighbor, cell[0], cell[1], cell[2]});
+                for (int i = 0; i < dofs_per_elem; ++i)
+                {
+                    buf.push_back(label[broken_to_local_dof[e * dofs_per_elem + i]]);
+                }
+            }
+        }
+        vector<int> recv_counts;
+        const vector<int> recv = Exchange(comm, send, recv_counts);
+
+        int local_changed = 0;
+        for (size_t pos = 0; pos < recv.size(); pos += message_size)
+        {
+            const int e = recv[pos] - element_offsets[rank];
+            const CellIndex neighbor_cell(recv[pos + 1], recv[pos + 2],
+                                          recv[pos + 3]);
+            const int *neighbor_labels = &recv[pos + 4];
+            for (int e_dof = 0; e_dof < dofs_per_elem; ++e_dof)
+            {
+                const int neighbor_dof =
+                    GetNeighborDof(element_to_cell[e], e_dof, neighbor_cell);
+                if (neighbor_dof == -1) { continue; }
+                int &l = label[broken_to_local_dof[e * dofs_per_elem + e_dof]];
+                if (neighbor_labels[neighbor_dof] < l)
+                {
+                    l = neighbor_labels[neighbor_dof];
+                    local_changed = 1;
+                }
+            }
+        }
+        int global_changed = 0;
+        MPI_Allreduce(&local_changed, &global_changed, 1, MPI_INT, MPI_LOR, comm);
+        changed = global_changed;
+    }
+
+    // 3. A local dof still labeled with its own global number holds the
+    //    smallest label among the copies of its true dof, so this rank owns
+    //    that true dof.
+    auto owned = [&](int dof) { return label[dof] == dof_offsets[rank] + dof; };
+
+    vector<int> dof_to_truedof(ndofs, -1);
+    int ntruedofs = 0;
+    for (int dof = 0; dof < ndofs; ++dof)
+    {
+        if (owned(dof)) { dof_to_truedof[dof] = ntruedofs++; }
+    }
+    const vector<int> truedof_offsets = GlobalOffsets(comm, ntruedofs);
+    for (int dof = 0; dof < ndofs; ++dof)
+    {
+        if (owned(dof)) { dof_to_truedof[dof] += truedof_offsets[rank]; }
+    }
+
+    // Ask the rank holding the smallest label of each remaining dof for its
+    // true dof number. The answers from each rank come back in the order of
+    // the queries sent to it.
+    // Sends [label]
+    vector<vector<int>> queries(nranks);
+    for (int dof = 0; dof < ndofs; ++dof)
+    {
+        if (!owned(dof))
+        {
+            queries[OffsetRank(dof_offsets, label[dof])].push_back(label[dof]);
+        }
+    }
+    vector<int> query_counts;
+    const vector<int> recv_queries = Exchange(comm, queries, query_counts);
+
+    // Sends [true dof]
+    vector<vector<int>> answers(nranks);
+    {
+        int pos = 0;
+        for (int src = 0; src < nranks; ++src)
+        {
+            for (int k = 0; k < query_counts[src]; ++k, ++pos)
+            {
+                const int dof = recv_queries[pos] - dof_offsets[rank];
+                answers[src].push_back(dof_to_truedof[dof]);
+            }
+        }
+    }
+    vector<int> answer_counts;
+    const vector<int> recv_answers = Exchange(comm, answers, answer_counts);
+
+    vector<int> next_answer(nranks, 0);
+    for (int r = 1; r < nranks; ++r)
+    {
+        next_answer[r] = next_answer[r - 1] + answer_counts[r - 1];
+    }
+    for (int dof = 0; dof < ndofs; ++dof)
+    {
+        if (!owned(dof))
+        {
+            const int r = OffsetRank(dof_offsets, label[dof]);
+            dof_to_truedof[dof] = recv_answers[next_answer[r]++];
+        }
+    }
+
+    // Each row (local dof) has a single 1 in the column of its true dof.
+    Array<int> I(ndofs + 1);
+    Array<HYPRE_BigInt> J(ndofs);
+    Vector data(ndofs);
+    for (int dof = 0; dof < ndofs; ++dof)
+    {
+        I[dof] = dof;
+        J[dof] = dof_to_truedof[dof];
+    }
+    I[ndofs] = ndofs;
+    data = 1.0;
+
+    const Array<HYPRE_BigInt> rows = HyprePartitioning(dof_offsets, rank);
+    const Array<HYPRE_BigInt> cols = HyprePartitioning(truedof_offsets, rank);
+    owned_dof_truedof = make_unique<HypreParMatrix>(
+        comm, ndofs, dof_offsets[nranks], truedof_offsets[nranks],
+        I.GetData(), J.GetData(), data.GetData(), rows.GetData(),
+        cols.GetData());
+    dof_truedof = owned_dof_truedof.get();
+}
+
+int VoxelGraph::GetNeighborDof(const CellIndex &e_cell, int e_dof,
+                               const CellIndex &neighbor_cell) const
+{
     int d = reference_fes.GetMesh()->Dimension();
     int neighbor_ref_element = 0;
     for (int i = 0; i < d; ++i)
@@ -636,23 +803,23 @@ int VoxelGraph::GetNeighborDof(int e, int e_dof, int neighbor)
 void VoxelGraph::ReindexDofs(const FiniteElementSpace &fes)
 {
     int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
-    int ntdofs = num_true_dofs;
+    int nldofs = num_local_dofs;
     int ne = graph.Size();
     int nbdofs = dofs_per_elem * ne;
-    vector<int> voxel_to_mfem(ntdofs);
-    for (int mfem_dof = 0; mfem_dof < ntdofs; ++mfem_dof)
+    vector<int> voxel_to_mfem(nldofs);
+    for (int mfem_dof = 0; mfem_dof < nldofs; ++mfem_dof)
     {
         int e = fes.GetElementForDof(mfem_dof);
         int local_mfem_index = fes.GetLocalDofForDof(mfem_dof);
         int broken_dof = e * dofs_per_elem + local_mfem_index;
-        int voxel_dof = broken_to_true_dof[broken_dof];
+        int voxel_dof = broken_to_local_dof[broken_dof];
         voxel_to_mfem[voxel_dof] = mfem_dof;
     }
 
     for (int bdof = 0; bdof < nbdofs; ++bdof)
     {
-        int voxel_dof = broken_to_true_dof[bdof];
+        int voxel_dof = broken_to_local_dof[bdof];
         int mfem_dof = voxel_to_mfem[voxel_dof];
-        broken_to_true_dof[bdof] = mfem_dof;
+        broken_to_local_dof[bdof] = mfem_dof;
     }
 }

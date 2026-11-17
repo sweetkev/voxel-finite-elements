@@ -60,16 +60,16 @@ private:
     // Builds matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
     // hat{A} is the block diagonal matrix with blocks corresponding to the
     // local element matrix A_ref, and Lambda is the boolean matrix mapping
-    // broken dofs to the true dofs.
-    void BuildA(int ntdofs, const std::vector<int> &broken_to_true_dof);
+    // broken dofs to the local dofs.
+    void BuildA(int nldofs, const std::vector<int> &broken_to_local_dof);
 
     // Builds the matrix A such that A = Lambda^T * hat{A} * Lambda. Here,
     // hat{A} is the block diagonal matrix with blocks corresponding to the
     // local element matrix A_e constructed from the hat{A} matrix from the 
     // finer level via 
     // A_e = (P_e)^T * (fine_Lambda_e)^T * fine_A_hat * fine_Lambda_e * P_e 
-    // Lambda is the boolean matrix mapping broken dofs to the true dofs. 
-    void BuildA(int ntdofs, const std::vector<int> &broken_to_true_dof,
+    // Lambda is the boolean matrix mapping broken dofs to the local dofs. 
+    void BuildA(int nldofs, const std::vector<int> &broken_to_local_dof,
                 VoxelGraphOperator &fine_operator,
                 SparseMatrix &P);
 };

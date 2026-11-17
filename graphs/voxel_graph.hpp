@@ -56,12 +56,22 @@ public:
         return off_rank_neighbors;
     }
 
-    int NumTrueDofs() const { return num_true_dofs; }
+    // Number of local dofs: the dofs on this rank after identifying the broken
+    // dofs shared by neighboring local elements. A dof shared with an element
+    // on another rank has a local copy on each rank, and GetDofTrueDofMatrix
+    // maps the copies to one global true dof.
+    int NumLocalDofs() const { return num_local_dofs; }
 
-    const vector<int> &GetBrokenToTrueDofMap() const 
-    { 
-        return broken_to_true_dof; 
+    // Maps each broken dof to its local dof.
+    const vector<int> &GetBrokenToLocalDofMap() const
+    {
+        return broken_to_local_dof;
     }
+
+    // Boolean matrix mapping global true dofs to local dofs. On the finest 
+    // level it is the matrix of the ParFiniteElementSpace passed to the 
+    // constructor.
+    HypreParMatrix &GetDofTrueDofMatrix() const { return *dof_truedof; }
 
     // Global number of the coarse element containing each local element.
     const vector<int> &GetFineToCoarseElementMap() const 
@@ -107,12 +117,18 @@ private:
     // Reference FES needed to determine DoF identification
     const FiniteElementSpace &reference_fes;
 
-    // Number of true dofs.
-    int num_true_dofs = 0;
+    // Number of local dofs (see NumLocalDofs).
+    int num_local_dofs = 0;
 
-    // Maps each broken dof index to the true dof index.
+    // Maps each broken dof index to the local dof index.
     // Size is (ne * dofs_per_element).
-    vector<int> broken_to_true_dof;
+    vector<int> broken_to_local_dof;
+
+    // Local dof to global true dof matrix. Points to owned_dof_truedof on
+    // coarse levels and to the ParFiniteElementSpace's matrix on the finest
+    // level.
+    HypreParMatrix *dof_truedof = nullptr;
+    unique_ptr<HypreParMatrix> owned_dof_truedof;
 
     // Matrix whose (i,j) entry denotes the local dof number on reference
     // element j which is identified with the local dof i on
@@ -134,14 +150,36 @@ private:
     // and jth column represents a reference element in the reference mesh.
     void CreateReferenceDofMap();
     
-    // Identifies broken dofs shared between neighboring elements, then builds
-    // broken_to_true_dof and sets num_true_dofs.
-    void CreateBrokenToTrueDofMap();
+    // Identifies broken dofs shared between neighboring local elements, then
+    // builds broken_to_local_dof and sets num_local_dofs.
+    void CreateBrokenToLocalDofMap();
+
+    // Builds owned_dof_truedof on a coarse level by identifying local dofs
+    // with the matching dofs of neighboring elements on other ranks.
+    //   1. Each local dof is labeled with a global number given by its local 
+    //      number plus the number of local dofs on lower ranks.
+    //   2. Each rank sends the labels of local dofs on every element with 
+    //      off-rank neighbors to the neighbors' ranks. Each received label 
+    //      replaces the label of the matching local dof if it is smaller. This 
+    //      repeats until no label changes, so every copy of a dof ends with the
+    //      smallest label among its copies.
+    //   3. The rank holding the local dof with that smallest label owns the
+    //      true dof. Owned true dofs are numbered globally, and the other ranks
+    //      ask the owners for the true dof numbers of their copies.
+    void CreateDofTrueDofMatrix();
 
     // Returns the local dof number on neighbor element that corresponds
     // to the local dof number e_dof on element e. If the dof is not shared
     // between elements, returns -1
-    int GetNeighborDof(int e, int e_dof, int neighbor);
+    int GetNeighborDof(int e, int e_dof, int neighbor) const
+    {
+        return GetNeighborDof(element_to_cell[e], e_dof,
+                              element_to_cell[neighbor]);
+    }
+
+    // Same as above, for elements in grid cells e_cell and neighbor_cell.
+    int GetNeighborDof(const CellIndex &e_cell, int e_dof,
+                       const CellIndex &neighbor_cell) const;
 
     // Reindex DOFs to match MFEM's labeling.
     void ReindexDofs(const FiniteElementSpace &fes);
