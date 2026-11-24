@@ -81,6 +81,38 @@ Array<HYPRE_BigInt> HyprePartitioning(const vector<int> &offsets, int rank)
    }
    return partitioning;
 }
+
+// Returns the boolean parallel matrix whose local row i has a single 1 in
+// global column cols[i]. Rows and columns are partitioned by row_offsets and
+// col_offsets from GlobalOffsets.
+unique_ptr<HypreParMatrix> BooleanParMatrix(MPI_Comm comm,
+                                            const vector<int> &row_offsets,
+                                            const vector<int> &col_offsets,
+                                            const vector<int> &cols)
+{
+   int rank;
+   MPI_Comm_rank(comm, &rank);
+   const int nranks = row_offsets.size() - 1;
+   const int nrows = cols.size();
+
+   Array<int> I(nrows + 1);
+   Array<HYPRE_BigInt> J(nrows);
+   Vector data(nrows);
+   for (int i = 0; i < nrows; ++i)
+   {
+      I[i] = i;
+      J[i] = cols[i];
+   }
+   I[nrows] = nrows;
+   data = 1.0;
+
+   const Array<HYPRE_BigInt> rows = HyprePartitioning(row_offsets, rank);
+   const Array<HYPRE_BigInt> col_part = HyprePartitioning(col_offsets, rank);
+   return make_unique<HypreParMatrix>(comm, nrows, row_offsets[nranks],
+                                      col_offsets[nranks], I.GetData(),
+                                      J.GetData(), data.GetData(),
+                                      rows.GetData(), col_part.GetData());
+}
 }
 
 VoxelGraph::VoxelGraph(const ParFiniteElementSpace &pfes,
@@ -114,6 +146,7 @@ VoxelGraph::VoxelGraph(const ParFiniteElementSpace &pfes,
 
    ReindexDofs(pfes);
    dof_truedof = pfes.Dof_TrueDof_Matrix();
+   CreateBrokenToTrueDofMatrix();
 }
 
 int VoxelGraph::ElementRank(int global_e) const
@@ -528,6 +561,7 @@ VoxelGraph::VoxelGraph(MPI_Comm comm_, vector<int> element_offsets_,
     CreateReferenceDofMap();
     CreateBrokenToLocalDofMap();
     CreateDofTrueDofMatrix();
+    CreateBrokenToTrueDofMatrix();
 }
 
 void VoxelGraph::CreateReferenceDofMap()
@@ -766,25 +800,32 @@ void VoxelGraph::CreateDofTrueDofMatrix()
         }
     }
 
-    // Each row (local dof) has a single 1 in the column of its true dof.
-    Array<int> I(ndofs + 1);
-    Array<HYPRE_BigInt> J(ndofs);
-    Vector data(ndofs);
-    for (int dof = 0; dof < ndofs; ++dof)
-    {
-        I[dof] = dof;
-        J[dof] = dof_to_truedof[dof];
-    }
-    I[ndofs] = ndofs;
-    data = 1.0;
-
-    const Array<HYPRE_BigInt> rows = HyprePartitioning(dof_offsets, rank);
-    const Array<HYPRE_BigInt> cols = HyprePartitioning(truedof_offsets, rank);
-    owned_dof_truedof = make_unique<HypreParMatrix>(
-        comm, ndofs, dof_offsets[nranks], truedof_offsets[nranks],
-        I.GetData(), J.GetData(), data.GetData(), rows.GetData(),
-        cols.GetData());
+    owned_dof_truedof = BooleanParMatrix(comm, dof_offsets, truedof_offsets,
+                                         dof_to_truedof);
     dof_truedof = owned_dof_truedof.get();
+}
+
+void VoxelGraph::CreateBrokenToTrueDofMatrix()
+{
+    const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
+    const int nbdofs = Size() * dofs_per_elem;
+
+    // Broken dofs are numbered globally element by element, and local dofs
+    // rank by rank (as in GetDofTrueDofMatrix).
+    vector<int> broken_offsets(element_offsets);
+    for (int &offset : broken_offsets) { offset *= dofs_per_elem; }
+    const vector<int> local_offsets = GlobalOffsets(comm, num_local_dofs);
+
+    vector<int> broken_to_global_local_dof(nbdofs);
+    for (int bdof = 0; bdof < nbdofs; ++bdof)
+    {
+        broken_to_global_local_dof[bdof] =
+            local_offsets[rank] + broken_to_local_dof[bdof];
+    }
+    const unique_ptr<HypreParMatrix> broken_to_local = BooleanParMatrix(
+        comm, broken_offsets, local_offsets, broken_to_global_local_dof);
+
+    broken_to_truedof.reset(ParMult(broken_to_local.get(), dof_truedof, true));
 }
 
 int VoxelGraph::GetNeighborDof(const CellIndex &e_cell, int e_dof,

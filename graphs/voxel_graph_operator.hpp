@@ -22,7 +22,11 @@ public:
     SparseMatrix &GetMatrix() { return A; }
 
     HypreParMatrix &GetParMatrix()
-    { return *A_par; }
+    {
+        MFEM_VERIFY(A_par, "Parallel matrix has not been assembled; coarse "
+                    "operators are not implemented in parallel yet");
+        return *A_par;
+    }
 
     HypreParMatrix &GetParLambda()
     { return *Lambda_par; }

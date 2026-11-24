@@ -73,6 +73,12 @@ public:
     // constructor.
     HypreParMatrix &GetDofTrueDofMatrix() const { return *dof_truedof; }
 
+    // Boolean matrix Lambda mapping global true dofs to broken dofs.
+    HypreParMatrix &GetBrokenToTrueDofMatrix() const
+    {
+        return *broken_to_truedof;
+    }
+
     // Global number of the coarse element containing each local element.
     const vector<int> &GetFineToCoarseElementMap() const 
     { 
@@ -130,6 +136,8 @@ private:
     HypreParMatrix *dof_truedof = nullptr;
     unique_ptr<HypreParMatrix> owned_dof_truedof;
 
+    unique_ptr<HypreParMatrix> broken_to_truedof;
+
     // Matrix whose (i,j) entry denotes the local dof number on reference
     // element j which is identified with the local dof i on
     // the central reference element.
@@ -167,6 +175,10 @@ private:
     //      true dof. Owned true dofs are numbered globally, and the other ranks
     //      ask the owners for the true dof numbers of their copies.
     void CreateDofTrueDofMatrix();
+
+    // Builds broken_to_truedof from broken_to_local_dof and dof_truedof.
+    // Collective.
+    void CreateBrokenToTrueDofMatrix();
 
     // Returns the local dof number on neighbor element that corresponds
     // to the local dof number e_dof on element e. If the dof is not shared
