@@ -2,40 +2,6 @@
 #include <algorithm>
 #include <unordered_set>
 
-vector<int> Exchange(MPI_Comm comm, const vector<vector<int>> &send,
-                     vector<int> &recv_counts)
-{
-    const int nranks = send.size();
-    vector<int> send_counts(nranks), send_displs(nranks + 1, 0);
-    for (int r = 0; r < nranks; ++r)
-    {
-        send_counts[r] = send[r].size();
-        send_displs[r + 1] = send_displs[r] + send_counts[r];
-    }
-
-    recv_counts.assign(nranks, 0);
-    MPI_Alltoall(send_counts.data(), 1, MPI_INT,
-                 recv_counts.data(), 1, MPI_INT, comm);
-
-    vector<int> recv_displs(nranks + 1, 0);
-    for (int r = 0; r < nranks; ++r)
-    {
-        recv_displs[r + 1] = recv_displs[r] + recv_counts[r];
-    }
-
-    vector<int> send_buf(send_displs[nranks]);
-    for (int r = 0; r < nranks; ++r)
-    {
-        copy(send[r].begin(), send[r].end(), send_buf.begin() + send_displs[r]);
-    }
-
-    vector<int> recv_buf(recv_displs[nranks]);
-    MPI_Alltoallv(send_buf.data(), send_counts.data(), send_displs.data(), MPI_INT,
-                  recv_buf.data(), recv_counts.data(), recv_displs.data(), MPI_INT,
-                  comm);
-    return recv_buf;
-}
-
 CellIndex AncestorCell(const CellIndex &cell, int current_level, int coarse_level)
 {
     // Each coarsening halves the cell index, so the ancestor is
@@ -50,6 +16,18 @@ CellIndex AncestorCell(const CellIndex &cell, int current_level, int coarse_leve
         ancestor[d] = (i >= 0) ? i / div : -((-i + div - 1) / div);
     }
     return ancestor;
+}
+
+int ChildIndex(const CellIndex &cell)
+{
+    // Lexicographic child position (x fastest) to refinement ordering. The
+    // first 4 entries are the quad ordering; all 8 are the hex ordering.
+    static constexpr int map_from_lex[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+    const CellIndex parent = AncestorCell(cell, 1, 0);
+    const int dx = cell[0] - 2 * parent[0];
+    const int dy = cell[1] - 2 * parent[1];
+    const int dz = cell[2] - 2 * parent[2];
+    return map_from_lex[dx + 2 * dy + 4 * dz];
 }
 
 CellOwnership::CellOwnership(MPI_Comm comm_, const vector<CellIndex> &fine_cells,

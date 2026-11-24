@@ -10,14 +10,52 @@ using namespace std;
 
 // All-to-all exchange: send[r] goes to rank r. Returns the
 // concatenation of all received buffers ordered by source rank, with the number
-// of ints received from each rank in recv_counts.
-vector<int> Exchange(MPI_Comm comm, const vector<vector<int>> &send,
-                     vector<int> &recv_counts);
+// of values received from each rank in recv_counts.
+template <typename T>
+vector<T> Exchange(MPI_Comm comm, const vector<vector<T>> &send,
+                   vector<int> &recv_counts)
+{
+    const MPI_Datatype type = MPITypeMap<T>::mpi_type;
+    const int nranks = send.size();
+    vector<int> send_counts(nranks), send_displs(nranks + 1, 0);
+    for (int r = 0; r < nranks; ++r)
+    {
+        send_counts[r] = send[r].size();
+        send_displs[r + 1] = send_displs[r] + send_counts[r];
+    }
+
+    recv_counts.assign(nranks, 0);
+    MPI_Alltoall(send_counts.data(), 1, MPI_INT,
+                 recv_counts.data(), 1, MPI_INT, comm);
+
+    vector<int> recv_displs(nranks + 1, 0);
+    for (int r = 0; r < nranks; ++r)
+    {
+        recv_displs[r + 1] = recv_displs[r] + recv_counts[r];
+    }
+
+    vector<T> send_buf(send_displs[nranks]);
+    for (int r = 0; r < nranks; ++r)
+    {
+        copy(send[r].begin(), send[r].end(), send_buf.begin() + send_displs[r]);
+    }
+
+    vector<T> recv_buf(recv_displs[nranks]);
+    MPI_Alltoallv(send_buf.data(), send_counts.data(), send_displs.data(), type,
+                  recv_buf.data(), recv_counts.data(), recv_displs.data(), type,
+                  comm);
+    return recv_buf;
+}
 
 // Returns the grid cell on coarse_level containing grid cell `cell` on
 // current_level.
 CellIndex AncestorCell(const CellIndex &cell, int current_level,
                        int coarse_level);
+
+// Position of `cell` among the children of its parent cell one level coarser,
+// in the ordering of MFEM's uniform refinement of a quadrilateral/hexahedron
+// (the order of CoarseFineTransformations::point_matrices).
+int ChildIndex(const CellIndex &cell);
 
 // Determines, for every coarse level, which MPI rank owns each coarse grid
 // cell. The owner of a coarse cell is the lowest rank holding any finest-level

@@ -31,8 +31,7 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     graphs[nlevels - 1] = std::move(fine_graph);
     ess_true_dofs[nlevels - 1] = fine_ess_dofs;
     graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h, a);
-    // Assemble the finest level operator in parallel and eliminate BCs.
-    graph_operators[nlevels - 1]->ParallelAssemble(*a.ParFESpace());
+    // Eliminate BCs from the finest level operator.
     graph_operators[nlevels - 1]->GetParMatrix().EliminateBC(fine_ess_dofs,
                                                              Operator::DIAG_ONE);
 
@@ -43,37 +42,20 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
         graphs[i] = make_unique<VoxelGraph>(graphs[i + 1]->CoarsenGraph(ownership, i));
     }
 
-    int nranks;
-    MPI_Comm_size(a.ParFESpace()->GetComm(), &nranks);
-
-    // Build the prolongations from finest to coarsest, since the coarse
-    // essential true dofs of each level are found from the fine ones.
+    // Build the prolongations and coarse operators.
     for (int i = nlevels - 2; i >= 0; --i)
     {
         prolongations[i] = CreateProlongation(*graphs[i], *graphs[i + 1],
                                               ess_true_dofs[i],
                                               ess_true_dofs[i + 1]);
-
-        // TODO: The coarse operators below are built from rank-local data,
-        // which only holds on one rank. There the local dofs are the true
-        // dofs, so the diagonal block of the prolongation is all of it.
-        if (nranks == 1)
-        {
-            SparseMatrix P_local;
-            prolongations[i]->GetDiag(P_local);
-            graph_operators[i] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[i], *graph_operators[i+1], P_local);
-
-            // Eliminate BCs from the operator.
-            for (const int ess_dof : ess_true_dofs[i])
-            {
-                graph_operators[i]->GetMatrix().EliminateRowCol(ess_dof, Operator::DIAG_ONE);
-            }
-        }
-
-        // The coarse operator above is built from the prolongation before
-        // its essential rows and columns are eliminated.
         EliminateProlongationEssentialDofs(*prolongations[i], ess_true_dofs[i],
                                            ess_true_dofs[i + 1]);
+
+        graph_operators[i] = make_unique<VoxelGraphOperator>(
+            reference_fes, *graphs[i], *graph_operators[i + 1],
+            local_prolongation);
+        graph_operators[i]->GetParMatrix().EliminateBC(ess_true_dofs[i],
+                                                       Operator::DIAG_ONE);
     }
 }
 
@@ -121,9 +103,6 @@ unique_ptr<HypreParMatrix> VoxelGraphHierarchy::CreateProlongation(
     const VoxelGraph &coarse_graph, const VoxelGraph &fine_graph,
     Array<int> &coarse_ess_true_dofs, const Array<int> &fine_ess_true_dofs)
 {
-    // The first 4 entries are the quad ordering; all 8 are the hex ordering.
-    static constexpr int map_from_lex[8] = {0, 1, 3, 2, 4, 5, 7, 6};
-
     const vector<int> &fine_to_coarse_element_map = fine_graph.GetFineToCoarseElementMap();
     const int dofs_per_elem = reference_fes.GetFE(0)->GetDof();
     const int fine_nbdofs = fine_graph.Size() * dofs_per_elem;
@@ -144,13 +123,8 @@ unique_ptr<HypreParMatrix> VoxelGraphHierarchy::CreateProlongation(
     for (int fine_e = 0; fine_e < fine_graph.Size(); ++fine_e)
     {
         const int coarse_e = fine_to_coarse_element_map[fine_e];
-        const CellIndex &fine_cell = fine_graph.GetElementCell(fine_e);
-        const CellIndex coarse_cell = AncestorCell(fine_cell, 1, 0);
-
-        const int dx = fine_cell[0] - 2 * coarse_cell[0];
-        const int dy = fine_cell[1] - 2 * coarse_cell[1];
-        const int dz = fine_cell[2] - 2 * coarse_cell[2];
-        const DenseMatrix &block = local_prolongation(map_from_lex[dx + 2*dy + 4*dz]);
+        const DenseMatrix &block =
+            local_prolongation(ChildIndex(fine_graph.GetElementCell(fine_e)));
 
         for (int rf = 0; rf < dofs_per_elem; ++rf)
         {

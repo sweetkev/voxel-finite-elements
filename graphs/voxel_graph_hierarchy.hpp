@@ -11,9 +11,9 @@ using namespace std;
 class VoxelGraphHierarchy
 {
 public:
-    // Creates finest level operator from a. ownership gives the rank that
-    // coarsens each coarse grid cell.
-    // TODO: Implement coarser level operators in parallel.
+    // Creates finest level operator from a, and each coarser level operator
+    // from the element matrices of the next finer level. ownership gives the
+    // rank that coarsens each coarse grid cell.
     VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, Array<int> &fine_ess_dofs, int nlevels,
                         const CellOwnership &ownership,
                         FiniteElementSpace &reference_fes, real_t h,
