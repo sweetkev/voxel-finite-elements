@@ -6,7 +6,8 @@
 class VoxelGraphOperator
 {
 public:
-    // Constructor for finest level using the bilinear form a.
+    // Constructor for finest level using the bilinear form a. The finest 
+    // parallel operator is MFEM's assembled matrix.
     VoxelGraphOperator(FiniteElementSpace &reference_fes_, VoxelGraph &graph_, real_t h_, BilinearForm &a);
 
     // Constructor for coarser levels which uses the finer operator. graph_ is

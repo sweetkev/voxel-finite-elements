@@ -9,7 +9,6 @@ VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,
 {
     BuildARef(a);
     BuildAHat();
-    ParallelAssemble();
 }
 
 VoxelGraphOperator::VoxelGraphOperator(FiniteElementSpace &reference_fes_,

@@ -18,8 +18,9 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
                     int nlevels,
                     const CellOwnership &ownership_,
                     FiniteElementSpace &reference_fes_,
-                    real_t h_, ParBilinearForm &a)
-                    : ownership(ownership_), reference_fes(reference_fes_), h(h_)
+                    real_t h_, ParBilinearForm &a, HypreParMatrix &fine_A_)
+                    : fine_A(fine_A_), ownership(ownership_),
+                      reference_fes(reference_fes_), h(h_)
 {
     CreateLocalProlongation(reference_fes.GetMesh()->Dimension());
 
@@ -31,9 +32,6 @@ VoxelGraphHierarchy::VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph,
     graphs[nlevels - 1] = std::move(fine_graph);
     ess_true_dofs[nlevels - 1] = fine_ess_dofs;
     graph_operators[nlevels - 1] = make_unique<VoxelGraphOperator>(reference_fes, *graphs[nlevels - 1], h, a);
-    // Eliminate BCs from the finest level operator.
-    graph_operators[nlevels - 1]->GetParMatrix().EliminateBC(fine_ess_dofs,
-                                                             Operator::DIAG_ONE);
 
     // Coarsen the graph level by level. The coarsening of each coarse grid
     // cell happens on its owner.

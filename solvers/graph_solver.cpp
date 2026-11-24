@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 
     VoxelGraphHierarchy graph_hierarchy(
         make_unique<VoxelGraph>(pfes, std::move(element_to_cell), reference_fes), ess_dofs,
-        nlevels, ownership, reference_fes, h, a);
+        nlevels, ownership, reference_fes, h, a, A);
 
     Array<Operator*> operators(nlevels);
     Array<Solver*> smoothers(nlevels);

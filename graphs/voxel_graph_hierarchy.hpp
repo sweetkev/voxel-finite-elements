@@ -11,19 +11,22 @@ using namespace std;
 class VoxelGraphHierarchy
 {
 public:
-    // Creates finest level operator from a, and each coarser level operator
-    // from the element matrices of the next finer level. ownership gives the
-    // rank that coarsens each coarse grid cell.
+    // The finest element matrices are built from a's integrators,
+    // and each coarser level operator from the element matrices of the next
+    // finer level. ownership gives the rank that coarsens each coarse grid
+    // cell.
     VoxelGraphHierarchy(unique_ptr<VoxelGraph> fine_graph, Array<int> &fine_ess_dofs, int nlevels,
                         const CellOwnership &ownership,
                         FiniteElementSpace &reference_fes, real_t h,
-                        ParBilinearForm &a);
+                        ParBilinearForm &a, HypreParMatrix &fine_A);
 
     vector<unique_ptr<VoxelGraphOperator>> &GetGraphOperators() { return graph_operators; }
 
-    // Parallel operator on the given level (0 is coarsest).
+    // Parallel operator on the given level (0 is coarsest). On the finest
+    // level this is fine_A.
     HypreParMatrix &GetParOperator(int level)
     {
+        if (level == (int)graph_operators.size() - 1) { return fine_A; }
         return graph_operators[level]->GetParMatrix();
     }
 
@@ -49,6 +52,8 @@ private:
     // Prolongations from level i to level i + 1 (true dof numbering)
     vector<unique_ptr<HypreParMatrix>> prolongations;
     vector<unique_ptr<VoxelGraphOperator>> graph_operators;
+    // Finest level operator, assembled by MFEM
+    HypreParMatrix &fine_A;
 
     // Owner rank of each coarse grid cell on every coarse level
     const CellOwnership &ownership;
